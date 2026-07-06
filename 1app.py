@@ -42,6 +42,8 @@ if st.sidebar.button("Analyse"):
                                 low=df['Low'], close=df['Close'])])
                 fig.update_layout(template="plotly_dark", title=f"{clean_ticker} Performance")
                 st.plotly_chart(fig, use_container_width=True)
+                df['SMA_50'] = df['Close'].rolling(window=50).mean()
+                fig.add_trace(go.Scatter(x=df.index, y=df['SMA_50'], name='50 SMA', line=dict(color='yellow', width=1.5)))
 
                 # AI 分析
                 client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")

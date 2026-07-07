@@ -3,9 +3,10 @@ import yfinance as yf
 import plotly.graph_objects as go
 from openai import OpenAI
 
-# [功能] 缓存数据函数
+# [修复] 缓存函数：只返回纯数据 DataFrame
 @st.cache_data
 def get_stock_data(ticker, period):
+    # 在这里创建临时 ticker 对象获取数据
     stock = yf.Ticker(ticker)
     df = stock.history(period=period)
     return df
@@ -29,15 +30,16 @@ if st.sidebar.button("Analyse"):
             # 清理输入
             clean_ticker = ticker.strip().upper()
 
+            # [修复] 获取数据：只接收 df，不解包
+            df = get_stock_data(clean_ticker, period)
+            
+            # 在主逻辑中单独创建 ticker 对象以获取 info (不缓存它)
             stock = yf.Ticker(clean_ticker)
-
-            # [优化] 调用缓存函数获取数据和对象
-            df, stock = get_stock_data(clean_ticker, period)
 
             if df.empty:
                 st.error(f"找不到代码 '{clean_ticker}'。")
             else:
-                # --- [新功能] 展示公司基本面信息 ---
+                # 展示公司基本面信息
                 info = stock.info
                 with st.expander("📊 查看公司基本面信息"):
                     col1, col2 = st.columns(2)
@@ -47,14 +49,11 @@ if st.sidebar.button("Analyse"):
                     col2.write(f"**市盈率 (PE)**: {info.get('trailingPE', 'N/A')}")
                     st.write(f"**公司简介**: {info.get('longBusinessSummary', '无详细介绍')}")
 
-                # 计算百分比变化
+                # 计算数据
                 df['Daily %'] = df['Close'].pct_change() * 100
-                
-                # 计算 50日移动平均线 (SMA 50)
                 df['SMA_50'] = df['Close'].rolling(window=50).mean()
                 
                 st.write(f"### {clean_ticker} Preview")
-                # 显示包含百分比的表格
                 st.dataframe(df.tail().style.format({'Daily %': '{:.2f}%'}))
 
                 # 画图
@@ -62,11 +61,8 @@ if st.sidebar.button("Analyse"):
                                 open=df['Open'], high=df['High'],
                                 low=df['Low'], close=df['Close'])])
                 
-                # 添加 SMA 50 到图表
                 fig.add_trace(go.Scatter(
-                    x=df.index, 
-                    y=df['SMA_50'], 
-                    name='50 SMA', 
+                    x=df.index, y=df['SMA_50'], name='50 SMA', 
                     line=dict(color='yellow', width=1.5)
                 ))
                 
@@ -75,7 +71,6 @@ if st.sidebar.button("Analyse"):
                 
                 # AI 分析
                 client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
-                # 将包含百分比的最后3行数据传给 AI
                 data_str = df[['Close', 'Daily %']].tail(3).to_string()
 
                 response = client.chat.completions.create(

@@ -30,7 +30,7 @@ if st.sidebar.button("Analyse"):
 
             # 获取数据
            stock = yf.Ticker(clean_ticker)
-           df = stock.history(period=period)
+           df = get_stock_data(clean_ticker, period)
         
             if df.empty:
                 st.error(f"找不到代码 '{clean_ticker}'。")

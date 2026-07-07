@@ -32,7 +32,7 @@ if st.sidebar.button("Analyse"):
                 # 计算百分比变化
                 df['Daily %'] = df['Close'].pct_change() * 100
                 
-                #计算 50日移动平均线 (SMA 50) 
+                # --- 新增: 计算 50日移动平均线 (SMA 50) ---
                 df['SMA_50'] = df['Close'].rolling(window=50).mean()
                 
                 st.write(f"### {clean_ticker} Preview")
@@ -43,15 +43,18 @@ if st.sidebar.button("Analyse"):
                 fig = go.Figure(data=[go.Candlestick(x=df.index,
                                 open=df['Open'], high=df['High'],
                                 low=df['Low'], close=df['Close'])])
+                
+                # --- 新增: 将 SMA 50 添加到图表中 ---
                 fig.add_trace(go.Scatter(
                     x=df.index, 
                     y=df['SMA_50'], 
                     name='50 SMA', 
                     line=dict(color='yellow', width=1.5)
                 ))
+                
                 fig.update_layout(template="plotly_dark", title=f"{clean_ticker} Performance")
                 st.plotly_chart(fig, use_container_width=True)
-               
+                
                 # AI 分析
                 client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
                 # 将包含百分比的最后3行数据传给 AI
@@ -60,7 +63,7 @@ if st.sidebar.button("Analyse"):
                 response = client.chat.completions.create(
                     model="llama-3.3-70b-versatile",
                     messages=[
-                        {"role": "system", "content": "你是一位金融分析师，擅长解读百分比波动。"},
+                        {"role": "system", "content": "你是一位金融分析师，擅长解读百分比波动和技术趋势。"},
                         {"role": "user", "content": f"分析 {clean_ticker} 的走势，数据包含收盘价和日涨跌幅%。数据：\n{data_str}"}
                     ]
                 )

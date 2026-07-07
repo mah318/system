@@ -37,11 +37,20 @@ if st.sidebar.button("Analyse"):
                 st.dataframe(df.tail().style.format({'Daily %': '{:.2f}%'}))
 
                 # 画图
+                df['SMA_50'] = df['Close'].rolling(window=50).mean() # 计算50日移动平均线
+                df['SMA_50'] = df['Close'].rolling(window=50).mean()
                 fig = go.Figure(data=[go.Candlestick(x=df.index,
                                 open=df['Open'], high=df['High'],
                                 low=df['Low'], close=df['Close'])])
                 fig.update_layout(template="plotly_dark", title=f"{clean_ticker} Performance")
                 st.plotly_chart(fig, use_container_width=True)
+                fig.add_trace(go.Scatter(
+                    x=df.index, 
+                    y=df['SMA_50'], 
+                    name='50 SMA', 
+                    line=dict(color='yellow', width=1.5)
+                ))
+              
                
                 # AI 分析
                 client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")

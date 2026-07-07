@@ -3,12 +3,12 @@ import yfinance as yf
 import plotly.graph_objects as go
 from openai import OpenAI
 
-# [新功能] 使用缓存装饰器
+# [功能] 缓存数据函数
 @st.cache_data
 def get_stock_data(ticker, period):
     stock = yf.Ticker(ticker)
     df = stock.history(period=period)
-    return df
+    return df, stock  # 同时返回 stock 对象以便后续获取 info
 
 st.set_page_config(page_title="Financial Terminal", layout="wide")
 st.title("📈 AI Financial Terminal")
@@ -29,12 +29,22 @@ if st.sidebar.button("Analyse"):
             # 清理输入
             clean_ticker = ticker.strip().upper()
 
-            # [优化] 调用缓存函数，而不是直接调用 yfinance
-            df = get_stock_data(clean_ticker, period)
+            # [优化] 调用缓存函数获取数据和对象
+            df, stock = get_stock_data(clean_ticker, period)
 
             if df.empty:
                 st.error(f"找不到代码 '{clean_ticker}'。")
             else:
+                # --- [新功能] 展示公司基本面信息 ---
+                info = stock.info
+                with st.expander("📊 查看公司基本面信息"):
+                    col1, col2 = st.columns(2)
+                    col1.write(f"**公司全称**: {info.get('longName', 'N/A')}")
+                    col1.write(f"**所属行业**: {info.get('industry', 'N/A')}")
+                    col2.write(f"**当前市值**: {info.get('marketCap', 0):,}")
+                    col2.write(f"**市盈率 (PE)**: {info.get('trailingPE', 'N/A')}")
+                    st.write(f"**公司简介**: {info.get('longBusinessSummary', '无详细介绍')}")
+
                 # 计算百分比变化
                 df['Daily %'] = df['Close'].pct_change() * 100
                 

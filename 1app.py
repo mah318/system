@@ -32,7 +32,7 @@ if st.sidebar.button("Analyse"):
                 # 计算百分比变化
                 df['Daily %'] = df['Close'].pct_change() * 100
                 
-                # --- 新增: 计算 50日移动平均线 (SMA 50) ---
+                # 计算 50日移动平均线 (SMA 50) ---
                 df['SMA_50'] = df['Close'].rolling(window=50).mean()
                 
                 st.write(f"### {clean_ticker} Preview")
@@ -43,8 +43,6 @@ if st.sidebar.button("Analyse"):
                 fig = go.Figure(data=[go.Candlestick(x=df.index,
                                 open=df['Open'], high=df['High'],
                                 low=df['Low'], close=df['Close'])])
-                
-                # --- 新增: 将 SMA 50 添加到图表中 ---
                 fig.add_trace(go.Scatter(
                     x=df.index, 
                     y=df['SMA_50'], 

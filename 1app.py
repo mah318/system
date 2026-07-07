@@ -3,12 +3,7 @@ import yfinance as yf
 import plotly.graph_objects as go
 from openai import OpenAI
 
-@st.cache_data
-def get_stock_data(ticker, period):
-    stock = yf.Ticker(ticker)
-    df = stock.history(period=period)
-    return df
-    
+
 st.set_page_config(page_title="Financial Terminal", layout="wide")
 st.title("📈 AI Financial Terminal")
 
@@ -30,7 +25,7 @@ if st.sidebar.button("Analyse"):
 
             # 获取数据
            stock = yf.Ticker(clean_ticker)
-           df = get_stock_data(clean_ticker, period)
+           df = stock.history(period=period)
         
             if df.empty:
                 st.error(f"找不到代码 '{clean_ticker}'。")

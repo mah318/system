@@ -70,16 +70,31 @@ if st.sidebar.button("Analyse"):
                 st.plotly_chart(fig, use_container_width=True)
                 
                 # AI 分析
-                client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
-                data_str = df[['Close', 'Daily %']].tail(3).to_string()
+                client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1"）
+                data_for_ai = df[['Close', 'Daily %', 'SMA_50']].tail(10).to_string()
+                info = stock.info
+                company_context = f"""
+                公司名称: {info.get('longName', 'N/A')}
+                行业: {info.get('industry', 'N/A')}
+                市值: {info.get('marketCap', 0)}
+                """
 
-                response = client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
-                    messages=[
-                        {"role": "system", "content": "你是一位金融分析师，擅长解读百分比波动和技术趋势。"},
-                        {"role": "user", "content": f"分析 {clean_ticker} 的走势，数据包含收盘价和日涨跌幅%。数据：\n{data_str}"}
-                    ]
-                )
-                st.info(response.choices[0].message.content)
+# 3. 优化系统提示词 (Prompt Engineering)
+system_prompt = f"""
+你是一位顶尖的量化金融分析师。
+请结合以下公司背景和最近10天的价格趋势（含50日均线数据）进行分析。
+如果股价在SMA_50之上，说明处于长期上升趋势；反之则需警惕。
+请给出趋势判断、关键支撑位及你的投资逻辑。
+"""
+
+# 4. 发送请求
+response = client.chat.completions.create(
+    model="llama-3.3-70b-versatile",
+    messages=[
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": f"分析对象:\n{company_context}\n\n最近10天数据:\n{data_for_ai}"}
+    ]
+)
+st.info(response.choices[0].message.content)
         except Exception as e:
             st.error(f"程序出错: {e}")

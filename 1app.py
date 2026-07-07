@@ -3,6 +3,12 @@ import yfinance as yf
 import plotly.graph_objects as go
 from openai import OpenAI
 
+@st.cache_data
+def get_stock_data(ticker, period):
+    stock = yf.Ticker(ticker)
+    df = stock.history(period=period)
+    return df
+    
 st.set_page_config(page_title="Financial Terminal", layout="wide")
 st.title("📈 AI Financial Terminal")
 
@@ -23,12 +29,22 @@ if st.sidebar.button("Analyse"):
             clean_ticker = ticker.strip().upper()
 
             # 获取数据
-            stock = yf.Ticker(clean_ticker)
-            df = stock.history(period=period)
-
+           df = get_stock_data(clean_ticker, period)
+        
             if df.empty:
                 st.error(f"找不到代码 '{clean_ticker}'。")
             else:
+                # --- [新功能] 展示公司基本面信息 ---
+                info = stock.info
+                with st.expander("📊 查看公司基本面信息"):
+                    col1, col2 = st.columns(2)
+                    col1.write(f"**公司全称**: {info.get('longName', 'N/A')}")
+                    col1.write(f"**所属行业**: {info.get('industry', 'N/A')}")
+                    col2.write(f"**当前市值**: {info.get('marketCap', 0):,}")
+                    col2.write(f"**市盈率 (PE)**: {info.get('trailingPE', 'N/A')}")
+                    st.write(f"**公司简介**: {info.get('longBusinessSummary', '无详细介绍')}")
+
+                # 计算百分比变化
                 # 计算百分比变化
                 df['Daily %'] = df['Close'].pct_change() * 100
                 

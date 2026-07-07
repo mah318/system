@@ -29,6 +29,8 @@ if st.sidebar.button("Analyse"):
             clean_ticker = ticker.strip().upper()
 
             # 获取数据
+           stock = yf.Ticker(clean_ticker)
+           df = stock.history(period=period)
            df = get_stock_data(clean_ticker, period)
         
             if df.empty:
@@ -44,7 +46,6 @@ if st.sidebar.button("Analyse"):
                     col2.write(f"**市盈率 (PE)**: {info.get('trailingPE', 'N/A')}")
                     st.write(f"**公司简介**: {info.get('longBusinessSummary', '无详细介绍')}")
 
-                # 计算百分比变化
                 # 计算百分比变化
                 df['Daily %'] = df['Close'].pct_change() * 100
                 

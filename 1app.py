@@ -8,7 +8,7 @@ from openai import OpenAI
 def get_stock_data(ticker, period):
     stock = yf.Ticker(ticker)
     df = stock.history(period=period)
-    return df, stock  # 同时返回 stock 对象以便后续获取 info
+    return df
 
 st.set_page_config(page_title="Financial Terminal", layout="wide")
 st.title("📈 AI Financial Terminal")
@@ -28,6 +28,8 @@ if st.sidebar.button("Analyse"):
         try:
             # 清理输入
             clean_ticker = ticker.strip().upper()
+
+            stock = yf.Ticker(clean_ticker)
 
             # [优化] 调用缓存函数获取数据和对象
             df, stock = get_stock_data(clean_ticker, period)

@@ -70,7 +70,7 @@ if st.sidebar.button("Analyse"):
                 st.plotly_chart(fig, use_container_width=True)
                 
                 # AI 分析
-                client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1"）
+                client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
                 data_for_ai = df[['Close', 'Daily %', 'SMA_50']].tail(10).to_string()
                 info = stock.info
                 company_context = f"""

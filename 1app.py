@@ -18,8 +18,8 @@ st.sidebar.header("配置")
 api_key = st.sidebar.text_input("API Key:", type="password")
 
 # [升级] 改为自由输入框
-tickers_raw = st.sidebar.text_input("输入股票代码 (用逗号隔开):", "AAPL, MSFT")
-period = st.sidebar.selectbox("时间范围:", ["1mo", "3mo", "6mo", "1y", "2y", "5y"])
+tickers_raw = st.sidebar.text_input("Stocks):", "AAPL, MSFT")
+period = st.sidebar.selectbox("Times:", ["1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "20y"])
 
 if st.sidebar.button("Analyse"):
     # 将输入的字符串转换为列表，并去除空格转为大写

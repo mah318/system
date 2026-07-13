@@ -16,73 +16,76 @@ st.title("📈 AI Financial Terminal")
 # 侧边栏配置
 st.sidebar.header("配置")
 api_key = st.sidebar.text_input("API Key:", type="password")
-
-# [升级] 改为自由输入框
-tickers_raw = st.sidebar.text_input("Stocks:", "AAPL")
-period = st.sidebar.selectbox("Times:", ["1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "20y"])
+ticker = st.sidebar.text_input("Enter Stock:", "AAPL")
+period = st.sidebar.selectbox("Time:", ["1D", "10D", "1mo", "3mo", "6mo", "1y", "10y", "20y"])
 
 if st.sidebar.button("Analyse"):
-    # 将输入的字符串转换为列表，并去除空格转为大写
-    tickers_input = [t.strip().upper() for t in tickers_raw.split(',') if t.strip()]
-    
     if not api_key:
         st.error("请输入 API Key")
-    elif not tickers_input:
-        st.error("请至少输入一个股票代码")
+    elif not ticker:
+        st.error("请输入股票代码")
     else:
         try:
-            fig = go.Figure()
-            
-            # 遍历解析出的列表
-            for t in tickers_input:
-                df = get_stock_data(t, period)
+            # 清理输入
+            clean_ticker = ticker.strip().upper()
+
+            # 获取数据
+            df = get_stock_data(clean_ticker, period)
+            stock = yf.Ticker(clean_ticker)
+
+            if df.empty:
+                st.error(f"找不到代码 '{clean_ticker}'。")
+            else:
+                # 展示公司基本面信息
+                info = stock.info
+                with st.expander("📊 查看公司基本面信息"):
+                    col1, col2 = st.columns(2)
+                    col1.write(f"**公司全称**: {info.get('longName', 'N/A')}")
+                    col1.write(f"**所属行业**: {info.get('industry', 'N/A')}")
+                    col2.write(f"**当前市值**: {info.get('marketCap', 0):,}")
+                    col2.write(f"**市盈率 (PE)**: {info.get('trailingPE', 'N/A')}")
+                    st.write(f"**公司简介**: {info.get('longBusinessSummary', '无详细介绍')}")
+
+                # 计算数据
+                df['Daily %'] = df['Close'].pct_change() * 100
+                df['SMA_50'] = df['Close'].rolling(window=50).mean()
                 
-                if df.empty:
-                    st.warning(f"无法获取代码 '{t}' 的数据，请检查代码拼写。")
-                    continue
+                st.write(f"### {clean_ticker} Preview")
+                st.dataframe(df.tail().style.format({'Daily %': '{:.2f}%'}))
+
+                # 画图
+                fig = go.Figure(data=[go.Candlestick(x=df.index,
+                                open=df['Open'], high=df['High'],
+                                low=df['Low'], close=df['Close'])])
                 
-                # 绘制折线图
-                fig.add_trace(go.Scatter(x=df.index, y=df['Close'], mode='lines', name=t))
+                fig.add_trace(go.Scatter(
+                    x=df.index, y=df['SMA_50'], name='50 SMA', 
+                    line=dict(color='yellow', width=1.5)
+                ))
+                
+                fig.update_layout(template="plotly_dark", title=f"{clean_ticker} Performance")
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # AI 分析
+                client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
+                data_for_ai = df[['Close', 'Daily %', 'SMA_50']].tail(10).to_string()
+                
+                system_prompt = f"""
+                你是一位顶尖的量化金融分析师。
+                请结合以下公司背景和最近10天的价格趋势（含50日均线数据）进行分析。
+                如果股价在SMA_50之上，说明处于长期上升趋势；反之则需警惕。
+                请给出趋势判断、关键支撑位及你的投资逻辑。
+                """
 
-            # 更新图表布局
-            fig.update_layout(
-                template="plotly_dark", 
-                title="股票表现对比",
-                xaxis_title="日期",
-                yaxis_title="收盘价 (USD)"
-            )
-            st.plotly_chart(fig, use_container_width=True)
+                response = client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": f"分析对象: {info.get('longName', 'N/A')}\n最近10天数据:\n{data_for_ai}"}
+                    ]
+                )
+                st.info(response.choices[0].message.content)
 
-            # AI 分析（依然锁定第一只股票作为分析主标的）
-            st.write("---")
-            primary_ticker = tickers_input[0]
-            st.subheader(f"深度 AI 分析: {primary_ticker}")
-            
-            df_primary = get_stock_data(primary_ticker, period)
-            stock_primary = yf.Ticker(primary_ticker)
-            info = stock_primary.info
-            
-            # 展示基本面
-            with st.expander("📊 查看公司基本面信息"):
-                st.write(f"**公司**: {info.get('longName', 'N/A')}")
-                st.write(f"**行业**: {info.get('industry', 'N/A')}")
-                st.write(f"**市值**: {info.get('marketCap', 0):,}")
-
-            # 准备 AI 数据
-            df_primary['Daily %'] = df_primary['Close'].pct_change() * 100
-            df_primary['SMA_50'] = df_primary['Close'].rolling(window=50).mean()
-            data_for_ai = df_primary[['Close', 'Daily %', 'SMA_50']].tail(10).to_string()
-            
-            client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
-            
-            response = client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=[
-                    {"role": "system", "content": "你是一位专业金融分析师。请分析给定数据，判断趋势并给出投资逻辑。"},
-                    {"role": "user", "content": f"分析对象: {info.get('longName', 'N/A')}\n最近10天数据:\n{data_for_ai}"}
-                ]
-            )
-            st.info(response.choices[0].message.content)
-
+        # 这是报错消失的关键：确保 try 后面有 except
         except Exception as e:
             st.error(f"程序出错: {e}")

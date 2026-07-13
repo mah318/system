@@ -18,7 +18,7 @@ st.sidebar.header("配置")
 api_key = st.sidebar.text_input("API Key:", type="password")
 
 # [升级] 改为自由输入框
-tickers_raw = st.sidebar.text_input("Stocks):", "AAPL, MSFT")
+tickers_raw = st.sidebar.text_input("Stocks:", "AAPL")
 period = st.sidebar.selectbox("Times:", ["1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "20y"])
 
 if st.sidebar.button("Analyse"):

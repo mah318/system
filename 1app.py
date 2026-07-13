@@ -17,34 +17,32 @@ st.title("📈 AI Financial Terminal")
 st.sidebar.header("配置")
 api_key = st.sidebar.text_input("API Key:", type="password")
 
-# [新功能] 使用 multiselect 支持多只股票
-tickers_input = st.sidebar.multiselect(
-    "选择股票:", 
-    ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META"], 
-    default=["AAPL"]
-)
+# [升级] 改为自由输入框
+tickers_raw = st.sidebar.text_input("输入股票代码 (用逗号隔开):", "AAPL, MSFT")
 period = st.sidebar.selectbox("时间范围:", ["1mo", "3mo", "6mo", "1y", "2y", "5y"])
 
 if st.sidebar.button("Analyse"):
+    # 将输入的字符串转换为列表，并去除空格转为大写
+    tickers_input = [t.strip().upper() for t in tickers_raw.split(',') if t.strip()]
+    
     if not api_key:
         st.error("请输入 API Key")
     elif not tickers_input:
-        st.error("请至少选择一只股票")
+        st.error("请至少输入一个股票代码")
     else:
         try:
             fig = go.Figure()
             
-            # 遍历每一只选择的股票进行绘制
+            # 遍历解析出的列表
             for t in tickers_input:
-                clean_ticker = t.strip().upper()
-                df = get_stock_data(clean_ticker, period)
+                df = get_stock_data(t, period)
                 
                 if df.empty:
-                    st.warning(f"无法获取代码 '{clean_ticker}' 的数据。")
+                    st.warning(f"无法获取代码 '{t}' 的数据，请检查代码拼写。")
                     continue
                 
-                # 绘制折线图用于对比
-                fig.add_trace(go.Scatter(x=df.index, y=df['Close'], mode='lines', name=clean_ticker))
+                # 绘制折线图
+                fig.add_trace(go.Scatter(x=df.index, y=df['Close'], mode='lines', name=t))
 
             # 更新图表布局
             fig.update_layout(
@@ -55,7 +53,7 @@ if st.sidebar.button("Analyse"):
             )
             st.plotly_chart(fig, use_container_width=True)
 
-            # AI 分析（只对列表中的第一只股票做深度分析，避免 Token 消耗过大）
+            # AI 分析（依然锁定第一只股票作为分析主标的）
             st.write("---")
             primary_ticker = tickers_input[0]
             st.subheader(f"深度 AI 分析: {primary_ticker}")

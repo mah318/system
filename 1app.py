@@ -31,7 +31,7 @@ if st.sidebar.button("Analyse"):
             fig = go.Figure()
             all_dfs = {}
             for t in tickers_input:
-                df, _ = get_stock_data(t, period)
+                df = get_stock_data(t, period)
                 if not df.empty:
                     # 归一化逻辑
                     y_data = (df['Close'] / df['Close'].iloc[0] - 1) * 100 if normalize else df['Close']

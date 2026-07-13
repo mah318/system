@@ -9,7 +9,7 @@ import pandas as pd
 def get_stock_data(ticker, period):
     stock = yf.Ticker(ticker)
     df = stock.history(period=period)
-    return df, stock
+    return df
 
 st.set_page_config(page_title="Financial Terminal", layout="wide")
 st.title("📈 Pro AI Financial Terminal")

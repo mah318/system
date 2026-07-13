@@ -18,7 +18,7 @@ st.title("📈 Pro AI Financial Terminal")
 st.sidebar.header("配置")
 api_key = st.sidebar.text_input("API Key:", type="password")
 tickers_raw = st.sidebar.text_input("Stocks:", "AAPL, MSFT")
-period = st.sidebar.selectbox("Times:", ["1D", "1mo", "3mo", "6mo", "1y", "2y", "5y", "10y"])
+period = st.sidebar.selectbox("Times:", ["7D", "1mo", "3mo", "6mo", "1y", "2y", "5y", "10y"])
 normalize = st.sidebar.checkbox("开启归一化对比 (从0%起步)", value=True)
 
 if st.sidebar.button("Analyse"):

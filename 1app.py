@@ -3,10 +3,9 @@ import yfinance as yf
 import plotly.graph_objects as go
 from openai import OpenAI
 
-# [修复] 缓存函数：只返回纯数据 DataFrame
+# 缓存函数：只返回纯数据 DataFrame
 @st.cache_data
 def get_stock_data(ticker, period):
-    # 在这里创建临时 ticker 对象获取数据
     stock = yf.Ticker(ticker)
     df = stock.history(period=period)
     return df
@@ -30,10 +29,8 @@ if st.sidebar.button("Analyse"):
             # 清理输入
             clean_ticker = ticker.strip().upper()
 
-            # [修复] 获取数据：只接收 df，不解包
+            # 获取数据
             df = get_stock_data(clean_ticker, period)
-            
-            # 在主逻辑中单独创建 ticker 对象以获取 info (不缓存它)
             stock = yf.Ticker(clean_ticker)
 
             if df.empty:
@@ -72,29 +69,23 @@ if st.sidebar.button("Analyse"):
                 # AI 分析
                 client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
                 data_for_ai = df[['Close', 'Daily %', 'SMA_50']].tail(10).to_string()
-                info = stock.info
-                company_context = f"""
-                公司名称: {info.get('longName', 'N/A')}
-                行业: {info.get('industry', 'N/A')}
-                市值: {info.get('marketCap', 0)}
+                
+                system_prompt = f"""
+                你是一位顶尖的量化金融分析师。
+                请结合以下公司背景和最近10天的价格趋势（含50日均线数据）进行分析。
+                如果股价在SMA_50之上，说明处于长期上升趋势；反之则需警惕。
+                请给出趋势判断、关键支撑位及你的投资逻辑。
                 """
 
-# 3. 优化系统提示词 (Prompt Engineering)
-system_prompt = f"""
-你是一位顶尖的量化金融分析师。
-请结合以下公司背景和最近10天的价格趋势（含50日均线数据）进行分析。
-如果股价在SMA_50之上，说明处于长期上升趋势；反之则需警惕。
-请给出趋势判断、关键支撑位及你的投资逻辑。
-"""
+                response = client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": f"分析对象: {info.get('longName', 'N/A')}\n最近10天数据:\n{data_for_ai}"}
+                    ]
+                )
+                st.info(response.choices[0].message.content)
 
-# 4. 发送请求
-response = client.chat.completions.create(
-    model="llama-3.3-70b-versatile",
-    messages=[
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": f"分析对象:\n{company_context}\n\n最近10天数据:\n{data_for_ai}"}
-    ]
-)
-st.info(response.choices[0].message.content)
+        # 这是报错消失的关键：确保 try 后面有 except
         except Exception as e:
             st.error(f"程序出错: {e}")

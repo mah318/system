@@ -16,7 +16,7 @@ st.title("📈 AI Financial Terminal")
 # 侧边栏配置
 st.sidebar.header("配置")
 api_key = st.sidebar.text_input("API Key:", type="password")
-ticker = st.sidebar.text_input("Enter Stock:", "AAPL")
+ticker = st.sidebar.multiselect("Enter Stock:", "AAPL")
 period = st.sidebar.selectbox("Time:", ["1D", "10D", "1mo", "3mo", "6mo", "1y", "10y", "20y"])
 
 if st.sidebar.button("Analyse"):

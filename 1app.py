@@ -11,14 +11,14 @@ def get_stock_data(ticker, period):
     df = stock.history(period=period)
     return df, stock
 
-st.set_page_config(page_title="Pro Financial Terminal", layout="wide")
+st.set_page_config(page_title="Financial Terminal", layout="wide")
 st.title("📈 Pro AI Financial Terminal")
 
 # 侧边栏
 st.sidebar.header("配置")
 api_key = st.sidebar.text_input("API Key:", type="password")
-tickers_raw = st.sidebar.text_input("股票代码 (逗号分隔):", "AAPL, MSFT")
-period = st.sidebar.selectbox("时间:", ["1mo", "3mo", "6mo", "1y", "2y"])
+tickers_raw = st.sidebar.text_input("Stocks:", "AAPL, MSFT")
+period = st.sidebar.selectbox("时间:", ["1D", "1w", "1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "20y'])
 normalize = st.sidebar.checkbox("开启归一化对比 (从0%起步)", value=True)
 
 if st.sidebar.button("Analyse"):

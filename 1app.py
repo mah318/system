@@ -47,24 +47,22 @@ if st.sidebar.button("Analyse"):
             df_primary = get_stock_data(primary_ticker, period)
             stock_primary = yf.Ticker(primary_ticker)
             
-            # 计算指标 (手动计算，无需 pandas-ta)
+            # 计算指标 (无需 pandas-ta)
             df_primary['Daily %'] = df_primary['Close'].pct_change() * 100
             
-            # RSI 计算
             delta = df_primary['Close'].diff()
             gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
             loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
             rs = gain / loss
             df_primary['RSI'] = 100 - (100 / (1 + rs))
             
-            # MACD 计算
             ema12 = df_primary['Close'].ewm(span=12, adjust=False).mean()
             ema26 = df_primary['Close'].ewm(span=26, adjust=False).mean()
             df_primary['MACD'] = ema12 - ema26
             df_primary['Signal'] = df_primary['MACD'].ewm(span=9, adjust=False).mean()
 
             # 2. Tabs 分页
-            tab1, tab2, tab3, tab4 = st.tabs(["技术指标"])
+            tab1, tab2, tab3, tab4 = st.tabs(["📊 技术指标", "📰 情绪分析", "📝 生成报告", "📋 数据预览"])
 
             with tab1:
                 st.subheader(f"技术指标: {primary_ticker}")
@@ -73,22 +71,18 @@ if st.sidebar.button("Analyse"):
                 st.write("MACD (12, 26, 9)")
                 st.line_chart(df_primary[['MACD', 'Signal']])
 
-          with tab2:
+            with tab2:
                 st.subheader("新闻情绪分析")
                 news = stock_primary.news
-                
-                # 安全获取标题：使用 .get() 方法，如果找不到 'title' 就返回 '无标题新闻'
                 if news and isinstance(news, list):
                     headlines = [n.get('title', '无标题新闻') for n in news[:5]]
                     st.write("**最新头条:**")
                     for h in headlines: 
                         st.write(f"- {h}")
                     
-                    # 只有在有头条时才进行 AI 分析
                     if headlines:
                         client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
                         sentiment_prompt = f"分析以下关于 {primary_ticker} 的新闻标题，判断市场情绪，并给出建议：\n{', '.join(headlines)}"
-                        
                         response = client.chat.completions.create(
                             model="llama-3.3-70b-versatile",
                             messages=[{"role": "user", "content": sentiment_prompt}]
@@ -97,10 +91,10 @@ if st.sidebar.button("Analyse"):
                         st.info(analysis_text)
                         st.session_state['analysis_result'] = analysis_text
                     else:
-                        st.warning("暂无新闻标题可供分析。")
+                        st.warning("暂无新闻标题。")
                 else:
-                    st.warning("当前无法获取此股票的新闻数据。")
-                    
+                    st.warning("无法获取新闻数据。")
+
             with tab3:
                 st.subheader("一键导出报告")
                 if 'analysis_result' in st.session_state:

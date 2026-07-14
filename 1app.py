@@ -51,12 +51,13 @@ if st.sidebar.button("Analyse"):
 
             with tab1:
                 st.subheader(f"技术指标: {primary_ticker}")
-                df_ta = df_primary.copy()
-                df_ta.ta.rsi(length=14, append=True)
-                df_ta.ta.macd(append=True)
-                st.line_chart(df_ta[['RSI_14']])
-                st.line_chart(df_ta[['MACD_12_26_9', 'MACDs_12_26_9']])
+                rsi_data = ta.rsi(df_primary['Close'], length=14)
+                macd_data = ta.macd(df_primary['Close'])
+                df_viz = pd.concat([rsi_data, macd_data], axis=1)
+                st.line_chart(df_viz[['RSI_14']])
+                st.line_chart(df_viz[['MACD_12_26_9', 'MACDs_12_26_9']])
 
+    
             with tab2:
                 st.subheader("新闻情绪分析")
                 news = stock_primary.news

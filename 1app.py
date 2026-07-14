@@ -49,7 +49,7 @@ if st.sidebar.button("Analyse"):
 
             # 2. Tabs 分页
             tab1, tab2, tab3, tab4 = st.tabs(["📊 技术指标", "📰 情绪分析", "📝 生成报告", "📋 数据预览"])
-
+            
             with tab1:
                 st.subheader(f"技术指标: {primary_ticker}")
                 rsi_data = ta.rsi(df_primary['Close'], length=14)

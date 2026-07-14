@@ -2,5 +2,4 @@ streamlit
 yfinance
 plotly
 pandas
-pandas-ta
 openai

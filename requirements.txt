@@ -1,6 +1,6 @@
 streamlit
 yfinance
 plotly
-openai
 pandas
 pandas-ta
+openai

@@ -16,7 +16,7 @@ st.title("📈 AI Financial Terminal")
 # 侧边栏配置
 st.sidebar.header("配置")
 api_key = st.sidebar.text_input("API Key:", type="password")
-ticker = st.sidebar.text_input("Enter Stock:", "AAPL")
+ticker_raw= st.sidebar.text_input("Enter Stock:", "AAPL")
 period = st.sidebar.selectbox("Time:", ["1D", "10D", "1mo", "3mo", "6mo", "1y", "10y", "20y"])
 normalize = st.sidebar.checkbox("开启归一化对比 (从0%起步)", value=True)
 

@@ -63,10 +63,12 @@ if st.sidebar.button("Analyse"):
             info = stock_primary.info
             
             # 展示基本面
+            info = stock.info
             with st.expander("📊 查看公司基本面信息"):
                 st.write(f"**公司**: {info.get('longName', 'N/A')}")
                 st.write(f"**行业**: {info.get('industry', 'N/A')}")
                 st.write(f"**市值**: {info.get('marketCap', 0):,}")
+                col2.write(f"**市盈率 (PE)**: {info.get('trailingPE', 'N/A')}")
 
             # 准备 AI 数据
             df_primary['Daily %'] = df_primary['Close'].pct_change() * 100

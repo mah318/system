@@ -64,7 +64,7 @@ if st.sidebar.button("Analyse"):
             df_primary['Signal'] = df_primary['MACD'].ewm(span=9, adjust=False).mean()
 
             # 2. Tabs 分页
-            tab1, tab2, tab3, tab4 = st.tabs(["📊 技术指标", "📰 情绪分析", "📝 生成报告", "📋 数据预览"])
+            tab1, tab2, tab3, tab4 = st.tabs(["技术指标"])
 
             with tab1:
                 st.subheader(f"技术指标: {primary_ticker}")
@@ -73,23 +73,34 @@ if st.sidebar.button("Analyse"):
                 st.write("MACD (12, 26, 9)")
                 st.line_chart(df_primary[['MACD', 'Signal']])
 
-            with tab2:
+          with tab2:
                 st.subheader("新闻情绪分析")
                 news = stock_primary.news
-                headlines = [n['title'] for n in news[:5]]
-                st.write("**最新头条:**")
-                for h in headlines: st.write(f"- {h}")
                 
-                client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
-                sentiment_prompt = f"分析以下关于 {primary_ticker} 的新闻标题，判断市场情绪，并给出建议：\n{', '.join(headlines)}"
-                response = client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
-                    messages=[{"role": "user", "content": sentiment_prompt}]
-                )
-                analysis_text = response.choices[0].message.content
-                st.info(analysis_text)
-                st.session_state['analysis_result'] = analysis_text
-
+                # 安全获取标题：使用 .get() 方法，如果找不到 'title' 就返回 '无标题新闻'
+                if news and isinstance(news, list):
+                    headlines = [n.get('title', '无标题新闻') for n in news[:5]]
+                    st.write("**最新头条:**")
+                    for h in headlines: 
+                        st.write(f"- {h}")
+                    
+                    # 只有在有头条时才进行 AI 分析
+                    if headlines:
+                        client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
+                        sentiment_prompt = f"分析以下关于 {primary_ticker} 的新闻标题，判断市场情绪，并给出建议：\n{', '.join(headlines)}"
+                        
+                        response = client.chat.completions.create(
+                            model="llama-3.3-70b-versatile",
+                            messages=[{"role": "user", "content": sentiment_prompt}]
+                        )
+                        analysis_text = response.choices[0].message.content
+                        st.info(analysis_text)
+                        st.session_state['analysis_result'] = analysis_text
+                    else:
+                        st.warning("暂无新闻标题可供分析。")
+                else:
+                    st.warning("当前无法获取此股票的新闻数据。")
+                    
             with tab3:
                 st.subheader("一键导出报告")
                 if 'analysis_result' in st.session_state:

@@ -1,7 +1,6 @@
 import streamlit as st
 import yfinance as yf
 import plotly.graph_objects as go
-import pandas_ta as ta
 from openai import OpenAI
 import pandas as pd
 
@@ -50,13 +49,28 @@ if st.sidebar.button("Analyse"):
             # 2. Tabs 分页
             tab1, tab2, tab3, tab4 = st.tabs(["📊 技术指标", "📰 情绪分析", "📝 生成报告", "📋 数据预览"])
             
-            with tab1:
+          with tab1:
                 st.subheader(f"技术指标: {primary_ticker}")
-                rsi_data = ta.rsi(df_primary['Close'], length=14)
-                macd_data = ta.macd(df_primary['Close'])
-                df_viz = pd.concat([rsi_data, macd_data], axis=1)
-                st.line_chart(df_viz[['RSI_14']])
-                st.line_chart(df_viz[['MACD_12_26_9', 'MACDs_12_26_9']])
+                
+                # 1. 计算 RSI (使用 Pandas 原生计算)
+                delta = df_primary['Close'].diff()
+                gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+                loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+                rs = gain / loss
+                df_primary['RSI'] = 100 - (100 / (1 + rs))
+                
+                # 2. 计算 MACD (使用 Pandas 原生计算)
+                ema12 = df_primary['Close'].ewm(span=12, adjust=False).mean()
+                ema26 = df_primary['Close'].ewm(span=26, adjust=False).mean()
+                df_primary['MACD'] = ema12 - ema26
+                df_primary['Signal'] = df_primary['MACD'].ewm(span=9, adjust=False).mean()
+                
+                # 绘图
+                st.write("RSI (14天)")
+                st.line_chart(df_primary[['RSI']])
+                
+                st.write("MACD (12, 26, 9)")
+                st.line_chart(df_primary[['MACD', 'Signal']])
 
     
             with tab2:

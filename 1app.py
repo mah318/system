@@ -65,6 +65,7 @@ if st.sidebar.button("Analyse"):
             # 展示基本面
             info = stock.info
             with st.expander("📊 查看公司基本面信息"):
+                col1, col2 = st.columns(2)
                 st.write(f"**公司**: {info.get('longName', 'N/A')}")
                 st.write(f"**行业**: {info.get('industry', 'N/A')}")
                 st.write(f"**市值**: {info.get('marketCap', 0):,}")

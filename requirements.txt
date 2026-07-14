@@ -3,3 +3,4 @@ yfinance
 plotly
 openai
 pandas
+pandas-ta

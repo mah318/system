@@ -91,14 +91,6 @@ if st.sidebar.button("Analyse"):
                 col4.metric("利润率 (Profit Margin)", f"{profit_margin*100:.2f}%" if isinstance(profit_margin, (int, float)) else "N/A")
                 col5.metric("营收增长率 (Revenue Growth)", f"{revenue_growth*100:.2f}%" if isinstance(revenue_growth, (int, float)) else "N/A")
                 
-                st.markdown("---")
-                st.write("**🤖 AI 基本盘深度评估:**")
-                fund_prompt = f"请根据以下基本面财务指标对 {primary_ticker} 进行基本盘分析评估：市值={market_cap}, 市盈率(PE)={pe_ratio}, 市净率(PB)={pb_ratio}, 利润率={profit_margin}, 营收增长率={revenue_growth}。评价其估值水平、盈利能力和投资价值。"
-                fund_response = client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
-                    messages=[{"role": "user", "content": fund_prompt}]
-                )
-                st.info(fund_response.choices[0].message.content)
 
             with tab2:
                 st.subheader(f"技术指标: {primary_ticker}")

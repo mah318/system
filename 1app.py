@@ -10,8 +10,8 @@ def get_stock_data(ticker, period):
     df = stock.history(period=period)
     return df
 
-st.set_page_config(page_title="Pro Financial Terminal", layout="wide")
-st.title("📈 AI Financial Terminal (Pro 深度版)")
+st.set_page_config(page_title="Financial Terminal", layout="wide")
+st.title("📈 AI Financial Terminal (精简投研版)")
 
 # 侧边栏配置
 st.sidebar.header("配置")
@@ -43,7 +43,7 @@ if st.sidebar.button("Analyse"):
             df_primary = get_stock_data(primary_ticker, period)
             stock_primary = yf.Ticker(primary_ticker)
             
-            # --- 深度扩充：获取更丰富的基础面与市场数据 ---
+            # 获取基本面与市场数据
             info = stock_primary.info
             fin_data = {
                 "market_cap": info.get('marketCap', 'N/A'),
@@ -56,13 +56,10 @@ if st.sidebar.button("Analyse"):
                 "debt_to_equity": info.get('debtToEquity', 'N/A'),
                 "beta": info.get('beta', 'N/A'),
                 "dividend_yield": info.get('dividendYield', 'N/A'),
-                "52w_high": info.get('fiftyTwoWeekHigh', 'N/A'),
-                "52w_low": info.get('fiftyTwoWeekLow', 'N/A'),
                 "target_price": info.get('targetMeanPrice', 'N/A'),
                 "recommendation": info.get('recommendationKey', 'N/A')
             }
             
-            # 格式化展示字符串
             market_cap_str = f"{fin_data['market_cap']:,}" if isinstance(fin_data['market_cap'], (int, float)) else str(fin_data['market_cap'])
             
             # 计算技术指标
@@ -82,74 +79,54 @@ if st.sidebar.button("Analyse"):
 
             latest = df_primary.iloc[-1]
 
-            # 获取更多新闻（最多 10 条）
             news = stock_primary.news
             headlines = []
             if news and isinstance(news, list):
-                headlines = [n.get('title', '无标题新闻') for n in news[:10]]
+                headlines = [n.get('title', '无标题新闻') for n in news[:8]]
 
-            # --- AI 深度全景诊断 (主页顶部) ---
-            with st.expander("🤖 AI 深度全景综合投研诊断", expanded=True):
-                client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
-                
-                comprehensive_prompt = f"""你是一位华尔街资深量化投研专家。请结合以下多维度的详尽数据，对股票 {primary_ticker} 进行一份严谨、深度、结构化的全景投研分析。
+            # --- AI 核心决策与精简诊断 ---
+            client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
+            
+            summary_prompt = f"""你是一位华尔街资深量化分析师。请根据以下数据对 {primary_ticker} 进行极简、高效的评级。
+【数据】
+- 当前价格: {current_price:.2f} (区间涨跌: {period_return:.2f}%)
+- RSI: {latest['RSI']:.2f}, MACD: {latest['MACD']:.2f}
+- PE: {fin_data['pe']}, PB: {fin_data['pb']}, ROE: {fin_data['roe']}
+- 分析师评级倾向: {fin_data['recommendation']} (目标价: {fin_data['target_price']})
+- 近期新闻: {', '.join(headlines[:3])}
 
-【1. 价格与技术面数据】
-- 当前价格: {current_price:.2f}
-- 选定周期累计涨跌幅: {period_return:.2f}%
-- RSI (14): {latest['RSI']:.2f}
-- MACD: {latest['MACD']:.2f}, Signal: {latest['Signal']:.2f}
-
-【2. 基本面与估值数据】
-- 市值: {market_cap_str}
-- 市盈率 (PE): {fin_data['pe']} (前瞻PE: {fin_data['forward_pe']})
-- 市净率 (PB): {fin_data['pb']}
-- 净资产收益率 (ROE): {fin_data['roe']}
-- 利润率: {fin_data['profit_margin']}
-- 营收增长率: {fin_data['revenue_growth']}
-- 债务权益比 (Debt/Equity): {fin_data['debt_to_equity']}
-- 贝塔系数 (Beta): {fin_data['beta']}
-- 52周最高/最低: {fin_data['52w_high']} / {fin_data['52w_low']}
-- 分析师目标均价: {fin_data['target_price']} (整体评级倾向: {fin_data['recommendation']})
-
-【3. 近期市场热点/新闻标题】
-{chr(10).join([f"- {h}" for h in headlines]) if headlines else "- 暂无近期新闻"}
-
-请输出包含以下模块的专业深度分析：
-1. **核心估值与基本盘评估**（结合PE、PB、ROE及成长性评价其财务健康度与安全边际）
-2. **技术面动量与趋势分析**（结合RSI、MACD与近期涨跌幅判断当前买卖点）
-3. **市场情绪与新闻解读**（结合新闻标题和分析师目标价分析市场共识）
-4. **综合投资建议与风险提示**（给出明确的中短期操作倾向及潜在风险点）
-
-排版请保持清晰、严谨，多使用序号和关键指标点缀。
+请严格按以下格式输出，字数精炼：
+【操作评级】买入 / 观望 / 卖出 (三选一，必须明确)
+【一句话核心理由】(控制在30字以内)
+【关键支撑与风险】(分两点，每点一句话)
 """
-                response = client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
-                    messages=[{"role": "user", "content": comprehensive_prompt}]
-                )
-                analysis_text = response.choices[0].message.content
-                st.write(analysis_text)
-                st.session_state['analysis_result'] = analysis_text
+            response = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": summary_prompt}]
+            )
+            ai_output = response.choices[0].message.content
+            st.session_state['analysis_result'] = ai_output
+
+            # 顶层醒目展示 AI 信号
+            st.subheader(f"🤖 AI 智能决策看板: {primary_ticker}")
+            st.info(ai_output)
 
             # 2. Tabs 分页
             tab1, tab2, tab3, tab4, tab5 = st.tabs(["🏢 基本面分析", "📊 技术指标", "📰 情绪分析", "📝 生成报告", "📋 数据预览"])
 
             with tab1:
-                st.subheader(f"基本盘深度指标: {primary_ticker}")
+                st.subheader("核心基本面指标")
                 col1, col2, col3, col4 = st.columns(4)
                 col1.metric("市值", market_cap_str)
                 col2.metric("市盈率 (PE)", str(fin_data['pe']))
-                col3.metric("前瞻PE", str(fin_data['forward_pe']))
-                col4.metric("市净率 (PB)", str(fin_data['pb']))
+                col3.metric("市净率 (PB)", str(fin_data['pb']))
+                col4.metric("ROE", str(fin_data['roe']))
                 
                 col5, col6, col7, col8 = st.columns(4)
-                col5.metric("ROE", str(fin_data['roe']))
-                col6.metric("利润率", str(fin_data['profit_margin']))
-                col7.metric("营收增长", str(fin_data['revenue_growth']))
-                col8.metric("贝塔 Beta", str(fin_data['beta']))
-
-                st.markdown("---")
-                st.write(f"**分析师共识评级:** {fin_data['recommendation']} | **目标均价:** {fin_data['target_price']}")
+                col5.metric("利润率", str(fin_data['profit_margin']))
+                col6.metric("营收增长", str(fin_data['revenue_growth']))
+                col7.metric("贝塔 Beta", str(fin_data['beta']))
+                col8.metric("分析师目标价", str(fin_data['target_price']))
 
             with tab2:
                 st.subheader(f"技术指标: {primary_ticker}")
@@ -157,20 +134,20 @@ if st.sidebar.button("Analyse"):
                 st.line_chart(df_primary[['MACD', 'Signal']])
 
             with tab3:
-                st.subheader("新闻情绪分析 (Top 10)")
+                st.subheader("精选市场新闻")
                 if headlines:
                     for h in headlines: 
-                        st.write(- {h})
+                        st.write(f"- {h}")
                 else:
                     st.warning("暂无新闻数据。")
 
             with tab4:
-                st.subheader("一键导出深度投研报告")
+                st.subheader("一键导出报告")
                 if 'analysis_result' in st.session_state:
                     st.download_button(
-                        label="下载完整投研报告 (TXT)",
+                        label="下载投研摘要 (TXT)",
                         data=st.session_state['analysis_result'],
-                        file_name=f"{primary_ticker}_deep_analysis.txt",
+                        file_name=f"{primary_ticker}_signal_report.txt",
                         mime="text/plain"
                     )
             

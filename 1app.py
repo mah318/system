@@ -71,7 +71,7 @@ if st.sidebar.button("Analyse"):
             latest = df_primary.iloc[-1]
             client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
 
-            # --- AI 智能信号看板 (顶层直接给出买入/观望/卖出评级与精简理由) ---
+            # --- AI 智能信号看板 ---
             tech_summary = f"Ticker: {primary_ticker}, RSI: {latest['RSI']:.2f}, MACD: {latest['MACD']:.2f}, Signal: {latest['Signal']:.2f}"
             signal_prompt = f"""请根据以下数据对 {primary_ticker} 进行极简的投资决策分析：
 - 技术面: {tech_summary}
@@ -83,7 +83,7 @@ if st.sidebar.button("Analyse"):
 【关键支撑与风险】(各一句话)
 """
             signal_response = client.chat.completions.create(
-                model="llama-3.1-70b-versatile",
+                model="llama-3.1-8b-instant",
                 messages=[{"role": "user", "content": signal_prompt}]
             )
             ai_signal_text = signal_response.choices[0].message.content
@@ -126,7 +126,7 @@ if st.sidebar.button("Analyse"):
    - 分析成长潜力
 """
                 fund_response = client.chat.completions.create(
-                    model="llama-3.1-70b-versatile",
+                    model="llama-3.1-8b-instant",
                     messages=[{"role": "user", "content": fund_prompt}]
                 )
                 st.write(fund_response.choices[0].message.content)
@@ -146,7 +146,7 @@ if st.sidebar.button("Analyse"):
                     if headlines:
                         sentiment_prompt = f"分析关于 {primary_ticker} 的新闻标题，判断市场情绪（精炼）：\n{', '.join(headlines)}"
                         sentiment_response = client.chat.completions.create(
-                            model="llama-3.1-70b-versatile",
+                            model="llama-3.1-8b-instant",
                             messages=[{"role": "user", "content": sentiment_prompt}]
                         )
                         st.info(sentiment_response.choices[0].message.content)

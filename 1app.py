@@ -13,22 +13,15 @@ def get_stock_data(ticker, period):
 st.set_page_config(page_title="Financial Terminal", layout="wide")
 st.title("📈 AI Financial Terminal")
 
-# 侧边栏配置
+# 侧边栏配置（已移除所有复杂的下拉选择）
 st.sidebar.header("配置")
 api_key = st.sidebar.text_input("API Key:", type="password")
-
-# 使用 Groq 官方标准的文本对话模型列表，避免选到音频或安全护栏模型
-model_list = [
-    "llama-3.3-70b-versatile",
-    "llama-3.1-8b-instant",
-    "mixtral-8x7b-32768",
-    "gemma2-9b-it"
-]
-
-selected_model = st.sidebar.selectbox("Model Name:", model_list)
 tickers_raw = st.sidebar.text_input("Enter Stock:", "AAPL")
 period = st.sidebar.selectbox("Time:", ["1D", "10D", "1mo", "3mo", "6mo", "1y", "10y", "20y"])
 normalize = st.sidebar.checkbox("开启归一化对比 (从0%起步)", value=True)
+
+# 内置稳定模型，无需手动选择
+DEFAULT_MODEL = "llama-3.3-70b-versatile"
 
 if st.sidebar.button("Analyse"):
     tickers_input = [t.strip().upper() for t in tickers_raw.split(',') if t.strip()]
@@ -84,7 +77,7 @@ if st.sidebar.button("Analyse"):
 
             latest = df_primary.iloc[-1]
 
-            # --- AI 智能信号看板 (带容灾保护) ---
+            # --- AI 智能信号看板 ---
             st.subheader(f"🤖 AI 智能决策看板: {primary_ticker}")
             if not api_key:
                 st.warning("未输入 API Key，已跳过 AI 智能分析。")
@@ -102,7 +95,7 @@ if st.sidebar.button("Analyse"):
 【关键支撑与风险】(各一句话)
 """
                     signal_response = client.chat.completions.create(
-                        model=selected_model,
+                        model=DEFAULT_MODEL,
                         messages=[{"role": "user", "content": signal_prompt}]
                     )
                     ai_signal_text = signal_response.choices[0].message.content
@@ -131,7 +124,7 @@ if st.sidebar.button("Analyse"):
                     try:
                         fund_prompt = f"请对 {primary_ticker} 进行简要基本面评估（PE: {pe_str}, PB: {pb_str}, 利润率: {margin_str}），分点列出5项核心指标评价。"
                         fund_response = client.chat.completions.create(
-                            model=selected_model,
+                            model=DEFAULT_MODEL,
                             messages=[{"role": "user", "content": fund_prompt}]
                         )
                         st.write(fund_response.choices[0].message.content)

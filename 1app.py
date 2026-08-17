@@ -139,7 +139,7 @@ if app_mode == "📊 机构研报与数据分析":
             latest = df_primary.iloc[-1]
 
             # --- 机构级专业 AI 量化投研看板 ---
-            st.subheader(f"🤖 机构级 AI 量化投研看板: {primary_ticker}")
+            st.subheader(f"Dashboard: {primary_ticker}")
             if not api_key or api_key == "你的API_KEY填在这里":
                 show_custom_alert("检测到未正确配置 API Key，请修改代码中的 BUILTIN_API_KEY。", "warning")
             else:

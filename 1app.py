@@ -14,8 +14,6 @@ if 'cash' not in st.session_state:
     st.session_state.cash = 100000.0  # 初始虚拟资金 10万美元
 if 'portfolio' not in st.session_state:
     st.session_state.portfolio = {}  # 格式: {ticker: {"shares": 数量, "avg_price": 均价}}
-if 'trade_history' not in st.session_state:
-    st.session_state.trade_history = []
 
 # 智能公司名称/代码转换函数（支持中文名搜索）
 def get_ticker_from_name(query):
@@ -42,25 +40,27 @@ def get_stock_data(ticker, period):
 st.set_page_config(page_title="Financial Terminal", layout="wide")
 st.title("📈 AI Financial Terminal (机构专业版 & 独立模拟交易)")
 
-# 侧边栏配置
-st.sidebar.header("配置 (资料分析)")
-tickers_raw = st.sidebar.text_input("Name:", "Apple")
-period = st.sidebar.selectbox("Time:", ["1D", "10D", "1mo", "3mo", "6mo", "1y", "10y", "20y"], index=2)
-normalize = st.sidebar.checkbox("开启归一化对比 (从0%起步)", value=True)
-
 # 优先从 secrets 读取，若无则使用上方定义的 BUILTIN_API_KEY
 try:
     api_key = st.secrets["GROQ_API_KEY"]
 except:
     api_key = BUILTIN_API_KEY
 
-if st.sidebar.button("Analyse"):
+# 侧边栏：独立的功能模块切换器（彻底根治点按钮变黑屏/空白的 Bug）
+st.sidebar.header("功能导航")
+app_mode = st.sidebar.radio("选择操作模式", ["📊 机构研报与数据分析", "🪙 独立模拟交易系统"])
+
+if app_mode == "📊 机构研报与数据分析":
+    st.sidebar.header("研报参数配置")
+    tickers_raw = st.sidebar.text_input("输入公司名称或代码 (支持中英文，多个用逗号隔开):", "苹果, 腾讯")
+    period = st.sidebar.selectbox("Time:", ["1D", "10D", "1mo", "3mo", "6mo", "1y", "10y", "20y"], index=2)
+    normalize = st.sidebar.checkbox("开启归一化对比 (从0%起步)", value=True)
+
     raw_inputs = [t.strip() for t in tickers_raw.split(',') if t.strip()]
     
     if not raw_inputs:
         st.error("请输入公司名称或股票代码")
     else:
-        # 将用户输入的名称实时转换为标准 Ticker
         tickers_input = []
         mapping_info = []
         for item in raw_inputs:
@@ -173,8 +173,8 @@ if st.sidebar.button("Analyse"):
                 except Exception as ai_err:
                     st.error(f"AI 智能决策请求失败: {ai_err}")
 
-            # 2. Tabs 分页（资料与模拟完全独立）
-            tab1, tab2, tab3, tab4 = st.tabs(["🏢 基本面分析", "📊 技术指标", "📋 数据预览", "🪙 独立模拟交易系统"])
+            # 研报内部 Tabs 分页
+            tab1, tab2, tab3 = st.tabs(["🏢 基本面分析", "📊 技术指标", "📋 数据预览"])
 
             with tab1:
                 st.subheader(f"基本盘分析: {primary_ticker}")
@@ -211,130 +211,128 @@ if st.sidebar.button("Analyse"):
                 st.subheader(f"{primary_ticker} 原始数据预览")
                 st.dataframe(df_primary.tail(10))
 
-            with tab4:
-                st.subheader("🪙 独立模拟交易与资产管理")
-                st.write("在这里你可以完全独立于上方研报的股票，自主输入任何股票代码进行虚拟买入和卖出。")
-                
-                # 独立选择交易标的
-                col_tinput, col_tinfo = st.columns([2, 3])
-                with col_tinput:
-                    trade_query = st.text_input("输入要交易的股票代码/名称:", "AAPL", key="independent_trade_ticker")
-                    resolved_trade_ticker = get_ticker_from_name(trade_query)
-                
-                # 获取独立交易标的的实时价格
-                trade_price = 0.0
-                if resolved_trade_ticker:
-                    try:
-                        trade_df = get_stock_data(resolved_trade_ticker, "1D")
-                        if not trade_df.empty:
-                            trade_price = float(trade_df['Close'].iloc[-1])
-                            with col_tinfo:
-                                st.markdown(f"""
-                                <div style="background-color: #1a1a1a; padding: 10px 15px; border-radius: 6px; border: 1px solid #333333; color: #f0f0f0; margin-top: 24px;">
-                                    🎯 目标标的: <b>{resolved_trade_ticker}</b> | 最新价格: <b style="color: #4CAF50;">${trade_price:.2f}</b>
-                                </div>
-                                """, unsafe_allow_html=True)
-                        else:
-                            st.warning("未找到该股票的行情数据，请检查输入。")
-                    except:
-                        st.warning("获取行情失败。")
+        except Exception as e:
+            st.error(f"程序运行出错: {e}")
 
-                st.markdown("---")
+elif app_mode == "🪙 独立模拟交易系统":
+    st.subheader("🪙 独立模拟交易与资产管理系统")
+    st.write("此模块与左侧研报数据**完全独立**。你可以随时输入任意股票代码进行虚拟买入和卖出，随时追踪资产盈亏。")
+    
+    # 独立选择交易标的
+    col_tinput, col_tinfo = st.columns([2, 3])
+    with col_tinput:
+        trade_query = st.text_input("输入要交易的股票代码/名称:", "AAPL", key="independent_trade_ticker")
+        resolved_trade_ticker = get_ticker_from_name(trade_query)
+    
+    # 获取独立交易标的的实时价格
+    trade_price = 0.0
+    if resolved_trade_ticker:
+        try:
+            trade_df = get_stock_data(resolved_trade_ticker, "1D")
+            if not trade_df.empty:
+                trade_price = float(trade_df['Close'].iloc[-1])
+                with col_tinfo:
+                    st.markdown(f"""
+                    <div style="background-color: #1a1a1a; padding: 10px 15px; border-radius: 6px; border: 1px solid #333333; color: #f0f0f0; margin-top: 24px;">
+                        🎯 目标标的: <b>{resolved_trade_ticker}</b> | 最新价格: <b style="color: #4CAF50;">${trade_price:.2f}</b>
+                    </div>
+                    """, unsafe_allow_html=True)
+            else:
+                st.warning("未找到该股票的行情数据，请检查输入。")
+        except:
+            st.warning("获取行情失败。")
 
-                # 计算当前持仓市值
-                total_stock_value = 0.0
-                portfolio_details = []
-                
-                for t, data in st.session_state.portfolio.items():
-                    shares = data["shares"]
-                    avg_price = data["avg_price"]
-                    latest_df = get_stock_data(t, "1D")
-                    cur_p = float(latest_df['Close'].iloc[-1]) if not latest_df.empty else avg_price
-                    market_val = shares * cur_p
-                    pnl = market_val - (shares * avg_price)
-                    pnl_pct = (pnl / (shares * avg_price)) * 100 if (shares * avg_price) > 0 else 0
-                    total_stock_value += market_val
-                    
-                    portfolio_details.append({
-                        "股票代码": t,
-                        "持仓数量": shares,
-                        "平均成本": f"${avg_price:.2f}",
-                        "当前价格": f"${cur_p:.2f}",
-                        "市值": f"${market_val:.2f}",
-                        "浮动盈亏": f"${pnl:.2f} ({pnl_pct:.2f}%)"
-                    })
+    st.markdown("---")
 
-                total_assets = st.session_state.cash + total_stock_value
-                total_profit = total_assets - 100000.0
-                total_profit_pct = (total_profit / 100000.0) * 100
+    # 计算当前持仓市值
+    total_stock_value = 0.0
+    portfolio_details = []
+    
+    for t, data in st.session_state.portfolio.items():
+        shares = data["shares"]
+        avg_price = data["avg_price"]
+        latest_df = get_stock_data(t, "1D")
+        cur_p = float(latest_df['Close'].iloc[-1]) if not latest_df.empty else avg_price
+        market_val = shares * cur_p
+        pnl = market_val - (shares * avg_price)
+        pnl_pct = (pnl / (shares * avg_price)) * 100 if (shares * avg_price) > 0 else 0
+        total_stock_value += market_val
+        
+        portfolio_details.append({
+            "股票代码": t,
+            "持仓数量": shares,
+            "平均成本": f"${avg_price:.2f}",
+            "当前价格": f"${cur_p:.2f}",
+            "市值": f"${market_val:.2f}",
+            "浮动盈亏": f"${pnl:.2f} ({pnl_pct:.2f}%)"
+        })
 
-                # 账户概览 Metrics
-                mcol1, mcol2, mcol3, mcol4 = st.columns(4)
-                mcol1.metric("账户总资产", f"${total_assets:,.2f}", f"{total_profit_pct:+.2f}%")
-                mcol2.metric("可用现金 (Cash)", f"${st.session_state.cash:,.2f}")
-                mcol3.metric("持仓市值", f"${total_stock_value:,.2f}")
-                mcol4.metric("累计盈亏", f"${total_profit:+,.2f}")
+    total_assets = st.session_state.cash + total_stock_value
+    total_profit = total_assets - 100000.0
+    total_profit_pct = (total_profit / 100000.0) * 100
 
-                st.markdown("---")
-                
-                # 交易买卖下单面板
-                col_buy, col_sell = st.columns(2)
-                
-                with col_buy:
-                    st.markdown(f"#### 🟢 买入: `{resolved_trade_ticker}`")
-                    buy_shares = st.number_input("买入股数", min_value=1, value=10, step=1, key="ind_buy_shares")
-                    total_cost = buy_shares * trade_price if trade_price > 0 else 0
-                    st.write(f"预计总花费: **${total_cost:,.2f}**")
-                    if st.button("确认买入此标的", key="btn_ind_buy"):
-                        if trade_price <= 0:
-                            st.error("无效的股票价格！")
-                        elif st.session_state.cash >= total_cost:
-                            st.session_state.cash -= total_cost
-                            if resolved_trade_ticker in st.session_state.portfolio:
-                                old_shares = st.session_state.portfolio[resolved_trade_ticker]["shares"]
-                                old_avg = st.session_state.portfolio[resolved_trade_ticker]["avg_price"]
-                                new_shares = old_shares + buy_shares
-                                new_avg = ((old_shares * old_avg) + total_cost) / new_shares
-                                st.session_state.portfolio[resolved_trade_ticker] = {"shares": new_shares, "avg_price": new_avg}
-                            else:
-                                st.session_state.portfolio[resolved_trade_ticker] = {"shares": buy_shares, "avg_price": trade_price}
-                            st.success(f"成功买入 {buy_shares} 股 {resolved_trade_ticker}！")
-                            st.rerun()
-                        else:
-                            st.error("可用现金不足，无法买入！")
+    # 账户概览 Metrics
+    mcol1, mcol2, mcol3, mcol4 = st.columns(4)
+    mcol1.metric("账户总资产", f"${total_assets:,.2f}", f"{total_profit_pct:+.2f}%")
+    mcol2.metric("可用现金 (Cash)", f"${st.session_state.cash:,.2f}")
+    mcol3.metric("持仓市值", f"${total_stock_value:,.2f}")
+    mcol4.metric("累计盈亏", f"${total_profit:+,.2f}")
 
-                with col_sell:
-                    st.markdown(f"#### 🔴 卖出: `{resolved_trade_ticker}`")
-                    owned_shares = st.session_state.portfolio.get(resolved_trade_ticker, {}).get("shares", 0)
-                    st.write(f"当前持有该股票数量: **{owned_shares} 股**")
-                    
-                    # 修复：持仓为0时避免 min_value 冲突报错
-                    if owned_shares > 0:
-                        sell_shares = st.number_input("卖出股数", min_value=1, max_value=owned_shares, value=1, step=1, key="ind_sell_shares")
-                    else:
-                        sell_shares = st.number_input("卖出股数", min_value=0, max_value=0, value=0, step=1, disabled=True, key="ind_sell_shares_disabled")
-                    
-                    if st.button("确认卖出此标的", key="btn_ind_sell"):
-                        if owned_shares >= sell_shares > 0 and trade_price > 0:
-                            earned_cash = sell_shares * trade_price
-                            st.session_state.cash += earned_cash
-                            if owned_shares == sell_shares:
-                                del st.session_state.portfolio[resolved_trade_ticker]
-                            else:
-                                st.session_state.portfolio[resolved_trade_ticker]["shares"] -= sell_shares
-                            st.success(f"成功卖出 {sell_shares} 股 {resolved_trade_ticker}，获得现金 ${earned_cash:,.2f}！")
-                            st.rerun()
-                        else:
-                            st.error("持仓数量不足或当前无持仓，无法卖出！")
-
-                st.markdown("---")
-                st.subheader("📦 当前所有持仓明细")
-                if portfolio_details:
-                    st.dataframe(pd.DataFrame(portfolio_details), use_container_width=True)
+    st.markdown("---")
+    
+    # 交易买卖下单面板
+    col_buy, col_sell = st.columns(2)
+    
+    with col_buy:
+        st.markdown(f"#### 🟢 买入: `{resolved_trade_ticker}`")
+        buy_shares = st.number_input("买入股数", min_value=1, value=10, step=1, key="ind_buy_shares")
+        total_cost = buy_shares * trade_price if trade_price > 0 else 0
+        st.write(f"预计总花费: **${total_cost:,.2f}**")
+        if st.button("确认买入此标的", key="btn_ind_buy"):
+            if trade_price <= 0:
+                st.error("无效的股票价格！")
+            elif st.session_state.cash >= total_cost:
+                st.session_state.cash -= total_cost
+                if resolved_trade_ticker in st.session_state.portfolio:
+                    old_shares = st.session_state.portfolio[resolved_trade_ticker]["shares"]
+                    old_avg = st.session_state.portfolio[resolved_trade_ticker]["avg_price"]
+                    new_shares = old_shares + buy_shares
+                    new_avg = ((old_shares * old_avg) + total_cost) / new_shares
+                    st.session_state.portfolio[resolved_trade_ticker] = {"shares": new_shares, "avg_price": new_avg}
                 else:
-                    st.info("当前暂无持仓股票，快在上方输入代码进行模拟交易吧！")
+                    st.session_state.portfolio[resolved_trade_ticker] = {"shares": buy_shares, "avg_price": trade_price}
+                st.success(f"成功买入 {buy_shares} 股 {resolved_trade_ticker}！")
+                st.rerun()
+            else:
+                st.error("可用现金不足，无法买入！")
 
-        except Exception as e:
-            st.error(f"程序运行出错: {e}")
-        except Exception as e:
-            st.error(f"程序运行出错: {e}")
+    with col_sell:
+        st.markdown(f"#### 🔴 卖出: `{resolved_trade_ticker}`")
+        owned_shares = st.session_state.portfolio.get(resolved_trade_ticker, {}).get("shares", 0)
+        st.write(f"当前持有该股票数量: **{owned_shares} 股**")
+        
+        # 严格防范 0 股时的参数越界 Bug
+        if owned_shares > 0:
+            sell_shares = st.number_input("卖出股数", min_value=1, max_value=owned_shares, value=1, step=1, key="ind_sell_shares")
+        else:
+            sell_shares = st.number_input("卖出股数", min_value=0, max_value=0, value=0, step=1, disabled=True, key="ind_sell_shares_disabled")
+        
+        if st.button("确认卖出此标的", key="btn_ind_sell"):
+            if owned_shares >= sell_shares > 0 and trade_price > 0:
+                earned_cash = sell_shares * trade_price
+                st.session_state.cash += earned_cash
+                if owned_shares == sell_shares:
+                    del st.session_state.portfolio[resolved_trade_ticker]
+                else:
+                    st.session_state.portfolio[resolved_trade_ticker]["shares"] -= sell_shares
+                st.success(f"成功卖出 {sell_shares} 股 {resolved_trade_ticker}，获得现金 ${earned_cash:,.2f}！")
+                st.rerun()
+            else:
+                st.error("持仓数量不足或当前无持仓，无法卖出！")
+
+    st.markdown("---")
+    st.subheader("📦 当前所有持仓明细")
+    if portfolio_details:
+        st.dataframe(pd.DataFrame(portfolio_details), use_container_width=True)
+    else:
+        st.info("当前暂无持仓股票，快在上方输入代码进行模拟交易吧！")

@@ -17,17 +17,13 @@ st.title("📈 AI Financial Terminal")
 st.sidebar.header("配置")
 api_key = st.sidebar.text_input("API Key:", type="password")
 
-# 动态获取可用模型列表（彻底解决 404 模型不匹配问题）
-model_list = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"] # 默认备用
-if api_key:
-    try:
-        temp_client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
-        models_response = temp_client.models.list()
-        fetched_models = [m.id for m in models_response.data]
-        if fetched_models:
-            model_list = fetched_models
-    except Exception:
-        pass
+# 使用 Groq 官方标准的文本对话模型列表，避免选到音频或安全护栏模型
+model_list = [
+    "llama-3.3-70b-versatile",
+    "llama-3.1-8b-instant",
+    "mixtral-8x7b-32768",
+    "gemma2-9b-it"
+]
 
 selected_model = st.sidebar.selectbox("Model Name:", model_list)
 tickers_raw = st.sidebar.text_input("Enter Stock:", "AAPL")

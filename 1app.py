@@ -32,13 +32,13 @@ st.title("📈 AI Financial Terminal")
 
 # 侧边栏配置（现在支持直接打公司名字）
 st.sidebar.header("配置")
-tickers_raw = st.sidebar.text_input("输入公司名称或代码 (支持中英文，多个用逗号隔开):", "苹果, 腾讯")
+tickers_raw = st.sidebar.text_input("Name:", "Apple")
 period = st.sidebar.selectbox("Time:", ["1D", "10D", "1mo", "3mo", "6mo", "1y", "10y", "20y"], index=2)
 normalize = st.sidebar.checkbox("开启归一化对比 (从0%起步)", value=True)
 
 # 自动从系统配置中读取内置的 API Key
 try:
-    BUILTIN_API_KEY = st.secrets["GROQ_API_KEY"]
+    BUILTIN_API_KEY = st.secrets["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"]
 except:
     BUILTIN_API_KEY = ""
 

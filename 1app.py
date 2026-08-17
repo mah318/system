@@ -4,6 +4,10 @@ import plotly.graph_objects as go
 from openai import OpenAI
 import pandas as pd
 
+# ==================== 在这里直接内置你的 API Key ====================
+BUILTIN_API_KEY = "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" 
+# ==================================================================
+
 @st.cache_data
 def get_stock_data(ticker, period):
     stock = yf.Ticker(ticker)
@@ -13,11 +17,10 @@ def get_stock_data(ticker, period):
 st.set_page_config(page_title="Financial Terminal", layout="wide")
 st.title("📈 AI Financial Terminal")
 
-# 侧边栏配置（默认时间：两周 10D）
+# 侧边栏配置（已移除 API Key 输入框，直接使用内置 Key）
 st.sidebar.header("配置")
-api_key = st.sidebar.text_input("API Key:", type="password")
 tickers_raw = st.sidebar.text_input("Enter Stock:", "NVDA")
-period = st.sidebar.selectbox("Time:", ["1D", "10D", "1mo", "3mo", "6mo", "1y", "10y", "20y"], index=1)
+period = st.sidebar.selectbox("Time:", ["1D", "10D", "1mo", "3mo", "6mo", "1y", "10y", "20y"], index=2)
 normalize = st.sidebar.checkbox("开启归一化对比 (从0%起步)", value=True)
 
 if st.sidebar.button("Analyse"):
@@ -74,13 +77,13 @@ if st.sidebar.button("Analyse"):
 
             latest = df_primary.iloc[-1]
 
-            # --- AI 智能信号看板 (强制纯数据硬核推断) ---
+            # --- AI 智能信号看板 ---
             st.subheader(f"🤖 AI 智能决策看板: {primary_ticker}")
-            if not api_key:
-                st.warning("未输入 API Key，已跳过 AI 智能分析。")
+            if not BUILTIN_API_KEY or BUILTIN_API_KEY == "你的API_KEY填在这里":
+                st.warning("检测到未正确配置内置 API Key，请先修改代码中的 BUILTIN_API_KEY。")
             else:
                 try:
-                    client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
+                    client = OpenAI(api_key=BUILTIN_API_KEY, base_url="https://api.groq.com/openai/v1")
                     
                     models_response = client.models.list()
                     available_models = [m.id for m in models_response.data]
@@ -93,7 +96,7 @@ if st.sidebar.button("Analyse"):
 
                     tech_summary = f"RSI: {latest['RSI']:.2f}, MACD: {latest['MACD']:.2f}"
                     
-                    signal_prompt = f"""你是一个顶尖的量化交易员。请根据以下**近两周（10个交易日）的精确数据**对 {primary_ticker} 进行客观、纯数据驱动的推断：
+                    signal_prompt = f"""你是一个顶尖的量化交易员。请根据以下**近1个月的精确数据**对 {primary_ticker} 进行客观、纯数据驱动的推断：
 - 短期技术面: {tech_summary}
 - 核心基本面: PE市盈率={pe_str}, PB市净率={pb_str}, 利润率={margin_str}, 营收增长={growth_str}
 
@@ -121,7 +124,7 @@ if st.sidebar.button("Analyse"):
                 except Exception as ai_err:
                     st.error(f"AI 智能决策请求失败: {ai_err}")
 
-            # 2. Tabs 分页（已精简：仅保留基本面分析、技术指标、数据预览）
+            # 2. Tabs 分页
             tab1, tab2, tab3 = st.tabs(["🏢 基本面分析", "📊 技术指标", "📋 数据预览"])
 
             with tab1:
@@ -137,7 +140,7 @@ if st.sidebar.button("Analyse"):
                 
                 st.markdown("---")
                 st.write("**🤖 AI 基本盘深度评估:**")
-                if api_key:
+                if BUILTIN_API_KEY and BUILTIN_API_KEY != "你的API_KEY填在这里":
                     try:
                         fund_prompt = f"基于 {primary_ticker} 的硬性数据（PE: {pe_str}, PB: {pb_str}, 利润率: {margin_str}, 营收增长: {growth_str}），请用数据推导列出5项核心基本面评价。"
                         fund_response = client.chat.completions.create(
@@ -148,10 +151,10 @@ if st.sidebar.button("Analyse"):
                     except:
                         st.write("基本面 AI 评估加载失败。")
                 else:
-                    st.info("请输入 API Key 以查看 AI 深度评估。")
+                    st.info("请先配置内置 API Key 以查看 AI 深度评估。")
 
             with tab2:
-                st.subheader(f"技术指标 (近两周): {primary_ticker}")
+                st.subheader(f"技术指标 (近1个月): {primary_ticker}")
                 st.line_chart(df_primary[['RSI']])
                 st.line_chart(df_primary[['MACD', 'Signal']])
 

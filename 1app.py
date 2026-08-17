@@ -16,11 +16,20 @@ st.title("📈 AI Financial Terminal")
 # 侧边栏配置
 st.sidebar.header("配置")
 api_key = st.sidebar.text_input("API Key:", type="password")
-# 增加模型选择下拉菜单，方便排查权限问题
-selected_model = st.sidebar.selectbox(
-    "Model Name:", 
-    ["llama-3.1-8b-instant", "llama3-8b-8192", "mixtral-8x7b-32768", "gemma2-9b-it"]
-)
+
+# 动态获取可用模型列表（彻底解决 404 模型不匹配问题）
+model_list = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"] # 默认备用
+if api_key:
+    try:
+        temp_client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
+        models_response = temp_client.models.list()
+        fetched_models = [m.id for m in models_response.data]
+        if fetched_models:
+            model_list = fetched_models
+    except Exception:
+        pass
+
+selected_model = st.sidebar.selectbox("Model Name:", model_list)
 tickers_raw = st.sidebar.text_input("Enter Stock:", "AAPL")
 period = st.sidebar.selectbox("Time:", ["1D", "10D", "1mo", "3mo", "6mo", "1y", "10y", "20y"])
 normalize = st.sidebar.checkbox("开启归一化对比 (从0%起步)", value=True)
@@ -104,7 +113,7 @@ if st.sidebar.button("Analyse"):
                     st.session_state['analysis_result'] = ai_signal_text
                     st.info(ai_signal_text)
                 except Exception as ai_err:
-                    st.error(f"AI 智能决策请求失败（请尝试在左侧切换其他 Model Name）: {ai_err}")
+                    st.error(f"AI 智能决策请求失败: {ai_err}")
 
             # 2. Tabs 分页
             tab1, tab2, tab3, tab4, tab5 = st.tabs(["🏢 基本面分析", "📊 技术指标", "📰 情绪分析", "📝 生成报告", "📋 数据预览"])

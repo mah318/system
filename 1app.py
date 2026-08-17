@@ -229,7 +229,7 @@ if app_mode == "📊 机构研报与数据分析":
         except Exception as e:
             show_custom_alert(f"程序运行出错: {e}", "error")
 
-elif app_mode == "🪙 独立模拟交易系统":
+elif app_mode == "🪙 模拟交易系统":
     st.subheader("🪙 独立模拟交易与资产管理系统")
     st.write("此模块与左侧研报数据**完全独立**。你可以随时输入任意股票代码进行虚拟买入和卖出，随时追踪资产盈亏。")
     

@@ -53,7 +53,7 @@ def get_stock_data(ticker, period):
     return df
 
 st.set_page_config(page_title="Financial Terminal", layout="wide")
-st.title("📈 AI Financial Terminal )")
+st.title("📈 AI Financial Terminal ")
 
 # 优先从 secrets 读取，若无则使用上方定义的 BUILTIN_API_KEY
 try:

@@ -13,11 +13,11 @@ def get_stock_data(ticker, period):
 st.set_page_config(page_title="Financial Terminal", layout="wide")
 st.title("📈 AI Financial Terminal")
 
-# 侧边栏配置
+# 侧边栏配置（默认时间已设为 1mo 一个月）
 st.sidebar.header("配置")
 api_key = st.sidebar.text_input("API Key:", type="password")
-tickers_raw = st.sidebar.text_input("Enter Stock:", "AAPL")
-period = st.sidebar.selectbox("Time:", ["1D", "10D", "1mo", "3mo", "6mo", "1y", "10y", "20y"])
+tickers_raw = st.sidebar.text_input("Enter Stock:", "NVDA")
+period = st.sidebar.selectbox("Time:", ["1D", "10D", "1mo", "3mo", "6mo", "1y", "10y", "20y"], index=2)
 normalize = st.sidebar.checkbox("开启归一化对比 (从0%起步)", value=True)
 
 if st.sidebar.button("Analyse"):
@@ -74,7 +74,7 @@ if st.sidebar.button("Analyse"):
 
             latest = df_primary.iloc[-1]
 
-            # --- AI 智能信号看板 (使用暗色高级卡片替代难看的蓝框) ---
+            # --- AI 智能信号看板 ---
             st.subheader(f"🤖 AI 智能决策看板: {primary_ticker}")
             if not api_key:
                 st.warning("未输入 API Key，已跳过 AI 智能分析。")
@@ -82,7 +82,6 @@ if st.sidebar.button("Analyse"):
                 try:
                     client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
                     
-                    # 自动获取账号下可用的模型并智能选择
                     models_response = client.models.list()
                     available_models = [m.id for m in models_response.data]
                     
@@ -93,7 +92,7 @@ if st.sidebar.button("Analyse"):
                             break
 
                     tech_summary = f"Ticker: {primary_ticker}, RSI: {latest['RSI']:.2f}, MACD: {latest['MACD']:.2f}"
-                    signal_prompt = f"""请根据以下数据对 {primary_ticker} 进行极简分析：
+                    signal_prompt = f"""请根据以下近一个月数据对 {primary_ticker} 进行极简分析：
 - 技术面: {tech_summary}
 - 基本面: PE={pe_str}, PB={pb_str}, 利润率={margin_str}, 营收增长={growth_str}
 
@@ -109,7 +108,6 @@ if st.sidebar.button("Analyse"):
                     ai_signal_text = signal_response.choices[0].message.content
                     st.session_state['analysis_result'] = ai_signal_text
                     
-                    # 使用自定义暗色卡片渲染，告别丑陋的默认蓝色
                     st.markdown(f"""
                     <div style="background-color: #1a1a1a; padding: 18px; border-radius: 10px; border: 1px solid #333333; color: #f0f0f0; font-size: 15px; line-height: 1.7; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
                         {ai_signal_text.replace('\n', '<br>')}
@@ -149,7 +147,7 @@ if st.sidebar.button("Analyse"):
                     st.info("请输入 API Key 以查看 AI 深度评估。")
 
             with tab2:
-                st.subheader(f"技术指标: {primary_ticker}")
+                st.subheader(f"技术指标 (近1个月): {primary_ticker}")
                 st.line_chart(df_primary[['RSI']])
                 st.line_chart(df_primary[['MACD', 'Signal']])
 

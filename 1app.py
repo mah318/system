@@ -64,7 +64,7 @@ if st.sidebar.button("Analyse"):
         # 将原先刺眼的蓝色 info 框改为高级黑灰风格卡片
         st.markdown(f"""
         <div style="background-color: #1a1a1a; padding: 12px 18px; border-radius: 8px; border: 1px solid #333333; color: #f0f0f0; font-size: 14px; margin-bottom: 15px;">
-            : {' | '.join(mapping_info)}
+            Result: {' | '.join(mapping_info)}
         </div>
         """, unsafe_allow_html=True)
 

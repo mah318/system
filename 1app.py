@@ -15,7 +15,7 @@ if 'cash' not in st.session_state:
 if 'portfolio' not in st.session_state:
     st.session_state.portfolio = {}  # 格式: {ticker: {"shares": 数量, "avg_price": 均价}}
 
-# 统一的暗黑主题提示框函数（确保所有提示颜色完全一致）
+# 统一的暗黑主题提示框函数
 def show_custom_alert(text, alert_type="info"):
     colors = {
         "info": "#a0a0a0",
@@ -53,7 +53,7 @@ def get_stock_data(ticker, period):
     return df
 
 st.set_page_config(page_title="Financial Terminal", layout="wide")
-st.title("📈 AI Financial Terminal (机构专业版 & 独立模拟交易)")
+st.title("📈 AI Financial Terminal (Institutional Edition & Paper Trading)")
 
 # 优先从 secrets 读取，若无则使用上方定义的 BUILTIN_API_KEY
 try:
@@ -62,19 +62,19 @@ except:
     api_key = BUILTIN_API_KEY
 
 # 侧边栏：独立的功能模块切换器
-st.sidebar.header("功能导航")
-app_mode = st.sidebar.radio("选择操作模式", ["📊 机构研报与数据分析", "🪙 独立模拟交易系统"])
+st.sidebar.header("Navigation")
+app_mode = st.sidebar.radio("Select Mode", ["📊 Institutional Reports & Analysis", "🪙 Paper Trading System"])
 
-if app_mode == "📊 机构研报与数据分析":
-    st.sidebar.header("研报参数配置")
-    tickers_raw = st.sidebar.text_input("输入公司名称或代码 (支持中英文，多个用逗号隔开):", "苹果, 腾讯")
+if app_mode == "📊 Institutional Reports & Analysis":
+    st.sidebar.header("Report Parameters")
+    tickers_raw = st.sidebar.text_input("Enter Company Name or Ticker (multiples separated by comma):", "AAPL, MSFT")
     period = st.sidebar.selectbox("Time:", ["1D", "10D", "1mo", "3mo", "6mo", "1y", "10y", "20y"], index=2)
-    normalize = st.sidebar.checkbox("开启归一化对比 (从0%起步)", value=True)
+    normalize = st.sidebar.checkbox("Normalize Comparison (Start from 0%)", value=True)
 
     raw_inputs = [t.strip() for t in tickers_raw.split(',') if t.strip()]
     
     if not raw_inputs:
-        show_custom_alert("请输入公司名称或股票代码", "error")
+        show_custom_alert("Please enter a company name or ticker", "error")
     else:
         tickers_input = []
         mapping_info = []
@@ -86,7 +86,7 @@ if app_mode == "📊 机构研报与数据分析":
         
         st.markdown(f"""
         <div style="background-color: #1a1a1a; padding: 12px 18px; border-radius: 8px; border: 1px solid #333333; color: #f0f0f0; font-size: 14px; margin-bottom: 15px;">
-            🔍 智能识别结果: {' | '.join(mapping_info)}
+            🔍 Resolved Tickers: {' | '.join(mapping_info)}
         </div>
         """, unsafe_allow_html=True)
 
@@ -99,14 +99,14 @@ if app_mode == "📊 机构研报与数据分析":
                 y_data = (df['Close'] / df['Close'].iloc[0] - 1) * 100 if normalize else df['Close']
                 fig.add_trace(go.Scatter(x=df.index, y=y_data, mode='lines', name=t))
 
-            fig.update_layout(template="plotly_dark", title="收益率对比" if normalize else "价格对比")
+            fig.update_layout(template="plotly_dark", title="Return Comparison" if normalize else "Price Comparison")
             st.plotly_chart(fig, use_container_width=True)
 
             # 准备主分析对象的数据
             primary_ticker = tickers_input[0]
             df_primary = get_stock_data(primary_ticker, period)
             if df_primary.empty:
-                show_custom_alert(f"未获取到 {primary_ticker} 的行情数据。", "error")
+                show_custom_alert(f"No market data found for {primary_ticker}.", "error")
                 st.stop()
                 
             stock_primary = yf.Ticker(primary_ticker)
@@ -139,9 +139,9 @@ if app_mode == "📊 机构研报与数据分析":
             latest = df_primary.iloc[-1]
 
             # --- 机构级专业 AI 量化投研看板 ---
-            st.subheader(f"🤖 机构级 AI 量化投研看板: {primary_ticker}")
+            st.subheader(f"🤖 Institutional AI Quant Research Dashboard: {primary_ticker}")
             if not api_key or api_key == "你的API_KEY填在这里":
-                show_custom_alert("检测到未正确配置 API Key，请修改代码中的 BUILTIN_API_KEY。", "warning")
+                show_custom_alert("API Key not configured properly. Please update BUILTIN_API_KEY in the code.", "warning")
             else:
                 try:
                     client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
@@ -186,24 +186,24 @@ if app_mode == "📊 机构研报与数据分析":
                     """, unsafe_allow_html=True)
                     
                 except Exception as ai_err:
-                    show_custom_alert(f"AI 智能决策请求失败: {ai_err}", "error")
+                    show_custom_alert(f"AI Decision Request Failed: {ai_err}", "error")
 
             # 研报内部 Tabs 分页
-            tab1, tab2, tab3 = st.tabs(["🏢 基本面分析", "📊 技术指标", "📋 数据预览"])
+            tab1, tab2, tab3 = st.tabs(["🏢 Fundamentals", "📊 Technical Indicators", "📋 Raw Data"])
 
             with tab1:
-                st.subheader(f"基本盘分析: {primary_ticker}")
+                st.subheader(f"Fundamentals Analysis: {primary_ticker}")
                 col1, col2, col3 = st.columns(3)
-                col1.metric("市值 (Market Cap)", market_cap_str)
-                col2.metric("市盈率 (P/E)", pe_str)
-                col3.metric("市净率 (P/B)", pb_str)
+                col1.metric("Market Cap", market_cap_str)
+                col2.metric("P/E Ratio", pe_str)
+                col3.metric("P/B Ratio", pb_str)
                 
                 col4, col5 = st.columns(2)
-                col4.metric("利润率 (Profit Margin)", margin_str)
-                col5.metric("营收增长率 (Revenue Growth)", growth_str)
+                col4.metric("Profit Margin", margin_str)
+                col5.metric("Revenue Growth", growth_str)
                 
                 st.markdown("---")
-                st.write("**🤖 AI 基本盘深度评估:**")
+                st.write("**🤖 AI Fundamental Deep Evaluation:**")
                 if api_key and api_key != "你的API_KEY填在这里":
                     try:
                         fund_prompt = f"基于 {primary_ticker} 的硬性数据（PE: {pe_str}, PB: {pb_str}, 利润率: {margin_str}, 营收增长: {growth_str}），请用数据推导列出5项核心基本面评价。"
@@ -213,30 +213,30 @@ if app_mode == "📊 机构研报与数据分析":
                         )
                         st.write(fund_response.choices[0].message.content)
                     except:
-                        show_custom_alert("基本面 AI 评估加载失败。", "error")
+                        show_custom_alert("Failed to load AI fundamental evaluation.", "error")
                 else:
-                    show_custom_alert("请先配置 API Key 以查看 AI 评估。", "warning")
+                    show_custom_alert("Please configure API Key to view AI evaluation.", "warning")
 
             with tab2:
-                st.subheader(f"技术指标 (近1个月): {primary_ticker}")
+                st.subheader(f"Technical Indicators (1M): {primary_ticker}")
                 st.line_chart(df_primary[['RSI']])
                 st.line_chart(df_primary[['MACD', 'Signal']])
 
             with tab3:
-                st.subheader(f"{primary_ticker} 原始数据预览")
+                st.subheader(f"{primary_ticker} Raw Data Preview")
                 st.dataframe(df_primary.tail(10))
 
         except Exception as e:
-            show_custom_alert(f"程序运行出错: {e}", "error")
+            show_custom_alert(f"Program Execution Error: {e}", "error")
 
-elif app_mode == "🪙 独立模拟交易系统":
-    st.subheader("🪙 独立模拟交易与资产管理系统")
-    st.write("此模块与左侧研报数据**完全独立**。你可以随时输入任意股票代码进行虚拟买入和卖出，随时追踪资产盈亏。")
+elif app_mode == "🪙 Paper Trading System":
+    st.subheader("🪙 Paper Trading & Asset Management System")
+    st.write("This module is **completely independent** of the report data. You can trade any stock virtually and track profits/losses.")
     
     # 独立选择交易标的
     col_tinput, col_tinfo = st.columns([2, 3])
     with col_tinput:
-        trade_query = st.text_input("输入要交易的股票代码/名称:", "AAPL", key="independent_trade_ticker")
+        trade_query = st.text_input("Enter Ticker/Name to Trade:", "AAPL", key="independent_trade_ticker")
         resolved_trade_ticker = get_ticker_from_name(trade_query)
     
     # 获取独立交易标的的实时价格
@@ -249,13 +249,13 @@ elif app_mode == "🪙 独立模拟交易系统":
                 with col_tinfo:
                     st.markdown(f"""
                     <div style="background-color: #1a1a1a; padding: 10px 15px; border-radius: 6px; border: 1px solid #333333; color: #f0f0f0; margin-top: 24px;">
-                        🎯 目标标的: <b>{resolved_trade_ticker}</b> | 最新价格: <b style="color: #4CAF50;">${trade_price:.2f}</b>
+                        🎯 Target: <b>{resolved_trade_ticker}</b> | Latest Price: <b style="color: #4CAF50;">${trade_price:.2f}</b>
                     </div>
                     """, unsafe_allow_html=True)
             else:
-                show_custom_alert("未找到该股票的行情数据，请检查输入。", "warning")
+                show_custom_alert("Market data not found, please check input.", "warning")
         except:
-            show_custom_alert("获取行情失败。", "warning")
+            show_custom_alert("Failed to fetch market data.", "warning")
 
     st.markdown("---")
 
@@ -274,12 +274,12 @@ elif app_mode == "🪙 独立模拟交易系统":
         total_stock_value += market_val
         
         portfolio_details.append({
-            "股票代码": t,
-            "持仓数量": shares,
-            "平均成本": f"${avg_price:.2f}",
-            "当前价格": f"${cur_p:.2f}",
-            "市值": f"${market_val:.2f}",
-            "浮动盈亏": f"${pnl:.2f} ({pnl_pct:.2f}%)"
+            "Ticker": t,
+            "Shares": shares,
+            "Avg Cost": f"${avg_price:.2f}",
+            "Current Price": f"${cur_p:.2f}",
+            "Market Value": f"${market_val:.2f}",
+            "Unrealized PnL": f"${pnl:.2f} ({pnl_pct:.2f}%)"
         })
 
     total_assets = st.session_state.cash + total_stock_value
@@ -288,10 +288,10 @@ elif app_mode == "🪙 独立模拟交易系统":
 
     # 账户概览 Metrics
     mcol1, mcol2, mcol3, mcol4 = st.columns(4)
-    mcol1.metric("账户总资产", f"${total_assets:,.2f}", f"{total_profit_pct:+.2f}%")
-    mcol2.metric("可用现金 (Cash)", f"${st.session_state.cash:,.2f}")
-    mcol3.metric("持仓市值", f"${total_stock_value:,.2f}")
-    mcol4.metric("累计盈亏", f"${total_profit:+,.2f}")
+    mcol1.metric("Total Assets", f"${total_assets:,.2f}", f"{total_profit_pct:+.2f}%")
+    mcol2.metric("Available Cash", f"${st.session_state.cash:,.2f}")
+    mcol3.metric("Portfolio Market Value", f"${total_stock_value:,.2f}")
+    mcol4.metric("Cumulative PnL", f"${total_profit:+,.2f}")
 
     st.markdown("---")
     
@@ -299,13 +299,13 @@ elif app_mode == "🪙 独立模拟交易系统":
     col_buy, col_sell = st.columns(2)
     
     with col_buy:
-        st.markdown(f"#### 🟢 买入: `{resolved_trade_ticker}`")
-        buy_shares = st.number_input("买入股数", min_value=1, value=10, step=1, key="ind_buy_shares")
+        st.markdown(f"#### 🟢 Buy: `{resolved_trade_ticker}`")
+        buy_shares = st.number_input("Shares to Buy", min_value=1, value=10, step=1, key="ind_buy_shares")
         total_cost = buy_shares * trade_price if trade_price > 0 else 0
-        st.write(f"预计总花费: **${total_cost:,.2f}**")
-        if st.button("确认买入此标的", key="btn_ind_buy"):
+        st.write(f"Estimated Total Cost: **${total_cost:,.2f}**")
+        if st.button("Confirm Buy", key="btn_ind_buy"):
             if trade_price <= 0:
-                show_custom_alert("无效的股票价格！", "error")
+                show_custom_alert("Invalid stock price!", "error")
             elif st.session_state.cash >= total_cost:
                 st.session_state.cash -= total_cost
                 if resolved_trade_ticker in st.session_state.portfolio:
@@ -316,22 +316,22 @@ elif app_mode == "🪙 独立模拟交易系统":
                     st.session_state.portfolio[resolved_trade_ticker] = {"shares": new_shares, "avg_price": new_avg}
                 else:
                     st.session_state.portfolio[resolved_trade_ticker] = {"shares": buy_shares, "avg_price": trade_price}
-                show_custom_alert(f"成功买入 {buy_shares} 股 {resolved_trade_ticker}！", "success")
+                show_custom_alert(f"Successfully bought {buy_shares} shares of {resolved_trade_ticker}!", "success")
                 st.rerun()
             else:
-                show_custom_alert("可用现金不足，无法买入！", "error")
+                show_custom_alert("Insufficient available cash!", "error")
 
     with col_sell:
-        st.markdown(f"#### 🔴 卖出: `{resolved_trade_ticker}`")
+        st.markdown(f"#### 🔴 Sell: `{resolved_trade_ticker}`")
         owned_shares = st.session_state.portfolio.get(resolved_trade_ticker, {}).get("shares", 0)
-        st.write(f"当前持有该股票数量: **{owned_shares} 股**")
+        st.write(f"Current Holdings: **{owned_shares} shares**")
         
         if owned_shares > 0:
-            sell_shares = st.number_input("卖出股数", min_value=1, max_value=owned_shares, value=1, step=1, key="ind_sell_shares")
+            sell_shares = st.number_input("Shares to Sell", min_value=1, max_value=owned_shares, value=1, step=1, key="ind_sell_shares")
         else:
-            sell_shares = st.number_input("卖出股数", min_value=0, max_value=0, value=0, step=1, disabled=True, key="ind_sell_shares_disabled")
+            sell_shares = st.number_input("Shares to Sell", min_value=0, max_value=0, value=0, step=1, disabled=True, key="ind_sell_shares_disabled")
         
-        if st.button("确认卖出此标的", key="btn_ind_sell"):
+        if st.button("Confirm Sell", key="btn_ind_sell"):
             if owned_shares >= sell_shares > 0 and trade_price > 0:
                 earned_cash = sell_shares * trade_price
                 st.session_state.cash += earned_cash
@@ -339,14 +339,14 @@ elif app_mode == "🪙 独立模拟交易系统":
                     del st.session_state.portfolio[resolved_trade_ticker]
                 else:
                     st.session_state.portfolio[resolved_trade_ticker]["shares"] -= sell_shares
-                show_custom_alert(f"成功卖出 {sell_shares} 股 {resolved_trade_ticker}，获得现金 ${earned_cash:,.2f}！", "success")
+                show_custom_alert(f"Successfully sold {sell_shares} shares of {resolved_trade_ticker}, received ${earned_cash:,.2f}!", "success")
                 st.rerun()
             else:
-                show_custom_alert("持仓数量不足或当前无持仓，无法卖出！", "error")
+                show_custom_alert("Insufficient holdings or no position to sell!", "error")
 
     st.markdown("---")
-    st.subheader("📦 当前所有持仓明细")
+    st.subheader("📦 Current Portfolio Details")
     if portfolio_details:
         st.dataframe(pd.DataFrame(portfolio_details), use_container_width=True)
     else:
-        show_custom_alert("📦 当前暂无持仓股票，快在上方输入代码进行模拟交易吧！", "info")
+        show_custom_alert("📦 No current holdings. Enter a ticker above to start paper trading!", "info")

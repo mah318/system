@@ -32,7 +32,7 @@ def get_stock_data(ticker, period):
     return df
 
 st.set_page_config(page_title="Financial Terminal", layout="wide")
-st.title("📈 AI Financial Terminal (机构专业版)")
+st.title(" AI Financial Terminal")
 
 # 侧边栏配置
 st.sidebar.header("配置")
@@ -64,7 +64,7 @@ if st.sidebar.button("Analyse"):
         # 将原先刺眼的蓝色 info 框改为高级黑灰风格卡片
         st.markdown(f"""
         <div style="background-color: #1a1a1a; padding: 12px 18px; border-radius: 8px; border: 1px solid #333333; color: #f0f0f0; font-size: 14px; margin-bottom: 15px;">
-            Result: {' | '.join(mapping_info)}
+           {' | '.join(mapping_info)}
         </div>
         """, unsafe_allow_html=True)
 

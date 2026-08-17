@@ -93,7 +93,6 @@ if st.sidebar.button("Analyse"):
 
                     tech_summary = f"RSI: {latest['RSI']:.2f}, MACD: {latest['MACD']:.2f}"
                     
-                    # 严苛的纯数据推断提示词
                     signal_prompt = f"""你是一个顶尖的量化交易员。请根据以下**近两周（10个交易日）的精确数据**对 {primary_ticker} 进行客观、纯数据驱动的推断：
 - 短期技术面: {tech_summary}
 - 核心基本面: PE市盈率={pe_str}, PB市净率={pb_str}, 利润率={margin_str}, 营收增长={growth_str}
@@ -112,7 +111,6 @@ if st.sidebar.button("Analyse"):
                         messages=[{"role": "user", "content": signal_prompt}]
                     )
                     ai_signal_text = signal_response.choices[0].message.content
-                    st.session_state['analysis_result'] = ai_signal_text
                     
                     st.markdown(f"""
                     <div style="background-color: #1a1a1a; padding: 18px; border-radius: 10px; border: 1px solid #333333; color: #f0f0f0; font-size: 15px; line-height: 1.7; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
@@ -123,8 +121,8 @@ if st.sidebar.button("Analyse"):
                 except Exception as ai_err:
                     st.error(f"AI 智能决策请求失败: {ai_err}")
 
-            # 2. Tabs 分页
-            tab1, tab2, tab3, tab4, tab5 = st.tabs(["🏢 基本面分析", "📊 技术指标", "📰 情绪分析", "📝 生成报告", "📋 数据预览"])
+            # 2. Tabs 分页（已精简：仅保留基本面分析、技术指标、数据预览）
+            tab1, tab2, tab3 = st.tabs(["🏢 基本面分析", "📊 技术指标", "📋 数据预览"])
 
             with tab1:
                 st.subheader(f"基本盘分析: {primary_ticker}")
@@ -158,25 +156,6 @@ if st.sidebar.button("Analyse"):
                 st.line_chart(df_primary[['MACD', 'Signal']])
 
             with tab3:
-                st.subheader("新闻情绪分析")
-                try:
-                    news = stock_primary.news
-                    if news and isinstance(news, list):
-                        headlines = [n.get('title', '无标题新闻') for n in news[:5]]
-                        for h in headlines: st.write(f"- {h}")
-                    else:
-                        st.write("暂无相关新闻。")
-                except:
-                    st.write("获取新闻接口异常。")
-
-            with tab4:
-                st.subheader("一键导出报告")
-                if 'analysis_result' in st.session_state:
-                    st.download_button("下载分析报告", data=st.session_state['analysis_result'], file_name=f"{primary_ticker}_analysis.txt")
-                else:
-                    st.write("当前暂无可导出的 AI 分析结果。")
-            
-            with tab5:
                 st.subheader(f"{primary_ticker} 原始数据预览")
                 st.dataframe(df_primary.tail(10))
 

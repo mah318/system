@@ -13,7 +13,7 @@ def get_stock_data(ticker, period):
 st.set_page_config(page_title="Financial Terminal", layout="wide")
 st.title("📈 AI Financial Terminal")
 
-# 侧边栏配置（默认时间已设为 10D 两个星期）
+# 侧边栏配置（默认时间：两周 10D）
 st.sidebar.header("配置")
 api_key = st.sidebar.text_input("API Key:", type="password")
 tickers_raw = st.sidebar.text_input("Enter Stock:", "NVDA")
@@ -74,7 +74,7 @@ if st.sidebar.button("Analyse"):
 
             latest = df_primary.iloc[-1]
 
-            # --- AI 智能信号看板 (强化倾向性，禁止模棱两可) ---
+            # --- AI 智能信号看板 (强制纯数据硬核推断) ---
             st.subheader(f"🤖 AI 智能决策看板: {primary_ticker}")
             if not api_key:
                 st.warning("未输入 API Key，已跳过 AI 智能分析。")
@@ -91,16 +91,21 @@ if st.sidebar.button("Analyse"):
                             auto_model = m
                             break
 
-                    tech_summary = f"Ticker: {primary_ticker}, RSI: {latest['RSI']:.2f}, MACD: {latest['MACD']:.2f}"
-                    signal_prompt = f"""请根据以下近两周数据对 {primary_ticker} 进行果断、犀利的分析：
-- 技术面: {tech_summary}
-- 基本面: PE={pe_str}, PB={pb_str}, 利润率={margin_str}, 营收增长={growth_str}
+                    tech_summary = f"RSI: {latest['RSI']:.2f}, MACD: {latest['MACD']:.2f}"
+                    
+                    # 严苛的纯数据推断提示词
+                    signal_prompt = f"""你是一个顶尖的量化交易员。请根据以下**近两周（10个交易日）的精确数据**对 {primary_ticker} 进行客观、纯数据驱动的推断：
+- 短期技术面: {tech_summary}
+- 核心基本面: PE市盈率={pe_str}, PB市净率={pb_str}, 利润率={margin_str}, 营收增长={growth_str}
 
-要求：必须表现出鲜明的观点，**严禁无脑观望或模棱两可**，根据多空指标强制倾向于“买入”或“卖出”其中之一。
+硬性要求：
+1. **严禁空洞废话**：所有结论必须直接扣紧上述给出的具体数字（如具体的 RSI 点位、PE 高低、利润率百分比）来进行逻辑推导。
+2. **拒绝模棱两可**：禁止使用“观望”或骑墙态度，必须基于多空数据对比，在“买入”或“卖出”中明确二选一。
+
 严格按以下格式输出：
-【操作评级】买入 / 卖出 (二选一，必须明确)
-【核心理由】(40字以内，直击要害)
-【关键支撑与风险】(各一句话)
+【操作评级】买入 / 卖出 (二选一)
+【核心理由】(40字以内，必须包含具体数据支撑)
+【关键支撑与风险】(各一句话，严格对应指标数据)
 """
                     signal_response = client.chat.completions.create(
                         model=auto_model,
@@ -136,7 +141,7 @@ if st.sidebar.button("Analyse"):
                 st.write("**🤖 AI 基本盘深度评估:**")
                 if api_key:
                     try:
-                        fund_prompt = f"请对 {primary_ticker} 进行简要基本面评估（PE: {pe_str}, PB: {pb_str}, 利润率: {margin_str}），分点列出5项核心指标评价。"
+                        fund_prompt = f"基于 {primary_ticker} 的硬性数据（PE: {pe_str}, PB: {pb_str}, 利润率: {margin_str}, 营收增长: {growth_str}），请用数据推导列出5项核心基本面评价。"
                         fund_response = client.chat.completions.create(
                             model=auto_model,
                             messages=[{"role": "user", "content": fund_prompt}]

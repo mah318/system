@@ -218,7 +218,7 @@ if app_mode == "📊 机构研报与数据分析":
                     show_custom_alert("请先配置 API Key 以查看 AI 评估。", "warning")
 
             with tab2:
-                st.subheader(f"技术指标 (近1个月): {primary_ticker}")
+                st.subheader(f"技术指标 : {primary_ticker}")
                 st.line_chart(df_primary[['RSI']])
                 st.line_chart(df_primary[['MACD', 'Signal']])
 

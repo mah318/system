@@ -23,8 +23,8 @@ normalize = st.sidebar.checkbox("开启归一化对比 (从0%起步)", value=Tru
 if st.sidebar.button("Analyse"):
     tickers_input = [t.strip().upper() for t in tickers_raw.split(',') if t.strip()]
     
-    if not api_key or not tickers_input:
-        st.error("请输入 API Key 和股票代码")
+    if not tickers_input:
+        st.error("请输入股票代码")
     else:
         try:
             # 1. 绘图与对比
@@ -41,9 +41,13 @@ if st.sidebar.button("Analyse"):
             # 准备主分析对象的数据
             primary_ticker = tickers_input[0]
             df_primary = get_stock_data(primary_ticker, period)
+            if df_primary.empty:
+                st.error(f"未获取到 {primary_ticker} 的行情数据，请检查代码是否正确。")
+                st.stop()
+                
             stock_primary = yf.Ticker(primary_ticker)
             
-            # 获取基本面核心指标并做美化处理
+            # 获取基本面核心指标
             info = stock_primary.info
             raw_market_cap = info.get('marketCap', 'N/A')
             raw_pe = info.get('trailingPE', 'N/A')
@@ -69,35 +73,39 @@ if st.sidebar.button("Analyse"):
             df_primary['Signal'] = df_primary['MACD'].ewm(span=9, adjust=False).mean()
 
             latest = df_primary.iloc[-1]
-            client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
 
-            # --- AI 智能信号看板 ---
-            tech_summary = f"Ticker: {primary_ticker}, RSI: {latest['RSI']:.2f}, MACD: {latest['MACD']:.2f}, Signal: {latest['Signal']:.2f}"
-            signal_prompt = f"""请根据以下数据对 {primary_ticker} 进行极简的投资决策分析：
+            # --- AI 智能信号看板 (带容灾保护) ---
+            st.subheader(f"🤖 AI 智能决策看板: {primary_ticker}")
+            if not api_key:
+                st.warning("未输入 API Key，已跳过 AI 智能分析，但可查看下方基础行情与指标。")
+            else:
+                try:
+                    client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
+                    tech_summary = f"Ticker: {primary_ticker}, RSI: {latest['RSI']:.2f}, MACD: {latest['MACD']:.2f}"
+                    signal_prompt = f"""请根据以下数据对 {primary_ticker} 进行极简分析：
 - 技术面: {tech_summary}
 - 基本面: PE={pe_str}, PB={pb_str}, 利润率={margin_str}, 营收增长={growth_str}
 
-请严格按以下格式输出，字数精炼：
+严格按以下格式输出：
 【操作评级】买入 / 观望 / 卖出 (三选一)
-【核心理由】(控制在40字以内)
+【核心理由】(40字以内)
 【关键支撑与风险】(各一句话)
 """
-            signal_response = client.chat.completions.create(
-                model="llama-3.1-8b-instant",
-                messages=[{"role": "user", "content": signal_prompt}]
-            )
-            ai_signal_text = signal_response.choices[0].message.content
-            st.session_state['analysis_result'] = ai_signal_text
-
-            st.subheader(f"🤖 AI 智能决策看板: {primary_ticker}")
-            st.info(ai_signal_text)
+                    signal_response = client.chat.completions.create(
+                        model="llama-3.1-8b-instant",
+                        messages=[{"role": "user", "content": signal_prompt}]
+                    )
+                    ai_signal_text = signal_response.choices[0].message.content
+                    st.session_state['analysis_result'] = ai_signal_text
+                    st.info(ai_signal_text)
+                except Exception as ai_err:
+                    st.error(f"AI 智能决策请求失败（请检查 API Key 是否有效）: {ai_err}")
 
             # 2. Tabs 分页
             tab1, tab2, tab3, tab4, tab5 = st.tabs(["🏢 基本面分析", "📊 技术指标", "📰 情绪分析", "📝 生成报告", "📋 数据预览"])
 
             with tab1:
                 st.subheader(f"基本盘分析: {primary_ticker}")
-                
                 col1, col2, col3 = st.columns(3)
                 col1.metric("市值 (Market Cap)", market_cap_str)
                 col2.metric("市盈率 (P/E)", pe_str)
@@ -109,27 +117,18 @@ if st.sidebar.button("Analyse"):
                 
                 st.markdown("---")
                 st.write("**🤖 AI 基本盘深度评估:**")
-                
-                fund_prompt = f"""请对 {primary_ticker} 进行基本面分析评估。核心财务指标：
-- 市值: {market_cap_str}, PE: {pe_str}, PB: {pb_str}, 利润率: {margin_str}, 营收增长: {growth_str}
-
-请使用带序号和缩进的清爽排版：
-1. 市值: {market_cap_str}
-   - 分析其规模与市场地位
-2. 市盈率 (P/E): {pe_str}
-   - 分析估值水平与性价比
-3. 市净率 (P/B): {pb_str}
-   - 分析资产状况与风险
-4. 利润率: {margin_str}
-   - 分析盈利与成本控制
-5. 营收增长率: {growth_str}
-   - 分析成长潜力
-"""
-                fund_response = client.chat.completions.create(
-                    model="llama-3.1-8b-instant",
-                    messages=[{"role": "user", "content": fund_prompt}]
-                )
-                st.write(fund_response.choices[0].message.content)
+                if api_key:
+                    try:
+                        fund_prompt = f"请对 {primary_ticker} 进行简要基本面评估（PE: {pe_str}, PB: {pb_str}, 利润率: {margin_str}），分点列出5项核心指标评价。"
+                        fund_response = client.chat.completions.create(
+                            model="llama-3.1-8b-instant",
+                            messages=[{"role": "user", "content": fund_prompt}]
+                        )
+                        st.write(fund_response.choices[0].message.content)
+                    except:
+                        st.write("基本面 AI 评估加载失败。")
+                else:
+                    st.info("请输入 API Key 以查看 AI 深度评估。")
 
             with tab2:
                 st.subheader(f"技术指标: {primary_ticker}")
@@ -138,27 +137,26 @@ if st.sidebar.button("Analyse"):
 
             with tab3:
                 st.subheader("新闻情绪分析")
-                news = stock_primary.news
-                if news and isinstance(news, list):
-                    headlines = [n.get('title', '无标题新闻') for n in news[:5]]
-                    for h in headlines: st.write(f"- {h}")
-                    
-                    if headlines:
-                        sentiment_prompt = f"分析关于 {primary_ticker} 的新闻标题，判断市场情绪（精炼）：\n{', '.join(headlines)}"
-                        sentiment_response = client.chat.completions.create(
-                            model="llama-3.1-8b-instant",
-                            messages=[{"role": "user", "content": sentiment_prompt}]
-                        )
-                        st.info(sentiment_response.choices[0].message.content)
+                try:
+                    news = stock_primary.news
+                    if news and isinstance(news, list):
+                        headlines = [n.get('title', '无标题新闻') for n in news[:5]]
+                        for h in headlines: st.write(f"- {h}")
+                    else:
+                        st.write("暂无相关新闻。")
+                except:
+                    st.write("获取新闻接口异常。")
 
             with tab4:
                 st.subheader("一键导出报告")
                 if 'analysis_result' in st.session_state:
                     st.download_button("下载分析报告", data=st.session_state['analysis_result'], file_name=f"{primary_ticker}_analysis.txt")
+                else:
+                    st.write("当前暂无可导出的 AI 分析结果。")
             
             with tab5:
                 st.subheader(f"{primary_ticker} 原始数据预览")
                 st.dataframe(df_primary.tail(10))
 
         except Exception as e:
-            st.error(f"程序出错: {e}")
+            st.error(f"程序运行出错: {e}")

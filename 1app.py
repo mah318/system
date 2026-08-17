@@ -63,11 +63,11 @@ except:
 
 # 侧边栏：独立的功能模块切换器
 st.sidebar.header("Navigation")
-app_mode = st.sidebar.radio("Select Mode", ["📊 Institutional Reports & Analysis", "🪙 Paper Trading System"])
+app_mode = st.sidebar.radio("Select Mode", ["Institutional Reports & Analysis", "Paper Trading System"])
 
 if app_mode == "📊 Institutional Reports & Analysis":
     st.sidebar.header("Report Parameters")
-    tickers_raw = st.sidebar.text_input("Enter Company Name or Ticker (multiples separated by comma):", "AAPL, MSFT")
+    tickers_raw = st.sidebar.text_input("Enter Company Name:", "AAPL")
     period = st.sidebar.selectbox("Time:", ["1D", "10D", "1mo", "3mo", "6mo", "1y", "10y", "20y"], index=2)
     normalize = st.sidebar.checkbox("Normalize Comparison (Start from 0%)", value=True)
 

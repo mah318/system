@@ -16,6 +16,11 @@ st.title("📈 AI Financial Terminal")
 # 侧边栏配置
 st.sidebar.header("配置")
 api_key = st.sidebar.text_input("API Key:", type="password")
+# 增加模型选择下拉菜单，方便排查权限问题
+selected_model = st.sidebar.selectbox(
+    "Model Name:", 
+    ["llama-3.1-8b-instant", "llama3-8b-8192", "mixtral-8x7b-32768", "gemma2-9b-it"]
+)
 tickers_raw = st.sidebar.text_input("Enter Stock:", "AAPL")
 period = st.sidebar.selectbox("Time:", ["1D", "10D", "1mo", "3mo", "6mo", "1y", "10y", "20y"])
 normalize = st.sidebar.checkbox("开启归一化对比 (从0%起步)", value=True)
@@ -42,7 +47,7 @@ if st.sidebar.button("Analyse"):
             primary_ticker = tickers_input[0]
             df_primary = get_stock_data(primary_ticker, period)
             if df_primary.empty:
-                st.error(f"未获取到 {primary_ticker} 的行情数据，请检查代码是否正确。")
+                st.error(f"未获取到 {primary_ticker} 的行情数据。")
                 st.stop()
                 
             stock_primary = yf.Ticker(primary_ticker)
@@ -77,7 +82,7 @@ if st.sidebar.button("Analyse"):
             # --- AI 智能信号看板 (带容灾保护) ---
             st.subheader(f"🤖 AI 智能决策看板: {primary_ticker}")
             if not api_key:
-                st.warning("未输入 API Key，已跳过 AI 智能分析，但可查看下方基础行情与指标。")
+                st.warning("未输入 API Key，已跳过 AI 智能分析。")
             else:
                 try:
                     client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
@@ -92,14 +97,14 @@ if st.sidebar.button("Analyse"):
 【关键支撑与风险】(各一句话)
 """
                     signal_response = client.chat.completions.create(
-                        model="llama-3.1-8b-instant",
+                        model=selected_model,
                         messages=[{"role": "user", "content": signal_prompt}]
                     )
                     ai_signal_text = signal_response.choices[0].message.content
                     st.session_state['analysis_result'] = ai_signal_text
                     st.info(ai_signal_text)
                 except Exception as ai_err:
-                    st.error(f"AI 智能决策请求失败（请检查 API Key 是否有效）: {ai_err}")
+                    st.error(f"AI 智能决策请求失败（请尝试在左侧切换其他 Model Name）: {ai_err}")
 
             # 2. Tabs 分页
             tab1, tab2, tab3, tab4, tab5 = st.tabs(["🏢 基本面分析", "📊 技术指标", "📰 情绪分析", "📝 生成报告", "📋 数据预览"])
@@ -121,7 +126,7 @@ if st.sidebar.button("Analyse"):
                     try:
                         fund_prompt = f"请对 {primary_ticker} 进行简要基本面评估（PE: {pe_str}, PB: {pb_str}, 利润率: {margin_str}），分点列出5项核心指标评价。"
                         fund_response = client.chat.completions.create(
-                            model="llama-3.1-8b-instant",
+                            model=selected_model,
                             messages=[{"role": "user", "content": fund_prompt}]
                         )
                         st.write(fund_response.choices[0].message.content)

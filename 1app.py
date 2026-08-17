@@ -3,10 +3,23 @@ import yfinance as yf
 import plotly.graph_objects as go
 from openai import OpenAI
 import pandas as pd
+import requests
 
-# ==================== 在这里直接内置你的 API Key ====================
-BUILTIN_API_KEY = "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" 
-# ==================================================================
+# 智能公司名称/代码转换函数
+def get_ticker_from_name(query):
+    query = query.strip()
+    if not query:
+        return ""
+    url = f"https://query2.finance.yahoo.com/v1/finance/search?q={query}"
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+    try:
+        r = requests.get(url, headers=headers, timeout=5)
+        data = r.json()
+        if 'quotes' in data and len(data['quotes']) > 0:
+            return data['quotes'][0]['symbol']
+    except Exception:
+        pass
+    return query.upper()
 
 @st.cache_data
 def get_stock_data(ticker, period):
@@ -17,18 +30,35 @@ def get_stock_data(ticker, period):
 st.set_page_config(page_title="Financial Terminal", layout="wide")
 st.title("📈 AI Financial Terminal")
 
-# 侧边栏配置（已移除 API Key 输入框，直接使用内置 Key）
+# 侧边栏配置（现在支持直接打公司名字）
 st.sidebar.header("配置")
-tickers_raw = st.sidebar.text_input("Enter Stock:", "NVDA")
+tickers_raw = st.sidebar.text_input("输入公司名称或代码 (支持中英文，多个用逗号隔开):", "苹果, 腾讯")
 period = st.sidebar.selectbox("Time:", ["1D", "10D", "1mo", "3mo", "6mo", "1y", "10y", "20y"], index=2)
 normalize = st.sidebar.checkbox("开启归一化对比 (从0%起步)", value=True)
 
+# 自动从系统配置中读取内置的 API Key
+try:
+    BUILTIN_API_KEY = st.secrets["GROQ_API_KEY"]
+except:
+    BUILTIN_API_KEY = ""
+
 if st.sidebar.button("Analyse"):
-    tickers_input = [t.strip().upper() for t in tickers_raw.split(',') if t.strip()]
+    raw_inputs = [t.strip() for t in tickers_raw.split(',') if t.strip()]
     
-    if not tickers_input:
-        st.error("请输入股票代码")
+    if not raw_inputs:
+        st.error("请输入公司名称或股票代码")
     else:
+        # 将用户输入的名称实时转换为标准 Ticker
+        tickers_input = []
+        mapping_info = []
+        for item in raw_inputs:
+            resolved = get_ticker_from_name(item)
+            if resolved:
+                tickers_input.append(resolved)
+                mapping_info.append(f"**{item}** ➔ `{resolved}`")
+        
+        st.info(f"🔍 智能识别结果: {' | '.join(mapping_info)}")
+
         try:
             # 1. 绘图与对比
             fig = go.Figure()
@@ -79,8 +109,8 @@ if st.sidebar.button("Analyse"):
 
             # --- AI 智能信号看板 ---
             st.subheader(f"🤖 AI 智能决策看板: {primary_ticker}")
-            if not BUILTIN_API_KEY or BUILTIN_API_KEY == "你的API_KEY填在这里":
-                st.warning("检测到未正确配置内置 API Key，请先修改代码中的 BUILTIN_API_KEY。")
+            if not BUILTIN_API_KEY:
+                st.warning("未检测到内置 API Key，请检查 .streamlit/secrets.toml 文件是否配置正确。")
             else:
                 try:
                     client = OpenAI(api_key=BUILTIN_API_KEY, base_url="https://api.groq.com/openai/v1")
@@ -140,7 +170,7 @@ if st.sidebar.button("Analyse"):
                 
                 st.markdown("---")
                 st.write("**🤖 AI 基本盘深度评估:**")
-                if BUILTIN_API_KEY and BUILTIN_API_KEY != "你的API_KEY填在这里":
+                if BUILTIN_API_KEY:
                     try:
                         fund_prompt = f"基于 {primary_ticker} 的硬性数据（PE: {pe_str}, PB: {pb_str}, 利润率: {margin_str}, 营收增长: {growth_str}），请用数据推导列出5项核心基本面评价。"
                         fund_response = client.chat.completions.create(
@@ -151,7 +181,7 @@ if st.sidebar.button("Analyse"):
                     except:
                         st.write("基本面 AI 评估加载失败。")
                 else:
-                    st.info("请先配置内置 API Key 以查看 AI 深度评估。")
+                    st.info("请先配置 API Key 以查看 AI 深度评估。")
 
             with tab2:
                 st.subheader(f"技术指标 (近1个月): {primary_ticker}")

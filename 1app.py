@@ -13,7 +13,7 @@ def get_stock_data(ticker, period):
 st.set_page_config(page_title="Financial Terminal", layout="wide")
 st.title("📈 AI Financial Terminal")
 
-# 侧边栏配置（无需选择模型，完全自动化）
+# 侧边栏配置
 st.sidebar.header("配置")
 api_key = st.sidebar.text_input("API Key:", type="password")
 tickers_raw = st.sidebar.text_input("Enter Stock:", "AAPL")
@@ -74,7 +74,7 @@ if st.sidebar.button("Analyse"):
 
             latest = df_primary.iloc[-1]
 
-            # --- AI 智能信号看板 (自动检测并使用你账号支持的模型) ---
+            # --- AI 智能信号看板 (使用暗色高级卡片替代难看的蓝框) ---
             st.subheader(f"🤖 AI 智能决策看板: {primary_ticker}")
             if not api_key:
                 st.warning("未输入 API Key，已跳过 AI 智能分析。")
@@ -108,7 +108,14 @@ if st.sidebar.button("Analyse"):
                     )
                     ai_signal_text = signal_response.choices[0].message.content
                     st.session_state['analysis_result'] = ai_signal_text
-                    st.info(ai_signal_text)
+                    
+                    # 使用自定义暗色卡片渲染，告别丑陋的默认蓝色
+                    st.markdown(f"""
+                    <div style="background-color: #1a1a1a; padding: 18px; border-radius: 10px; border: 1px solid #333333; color: #f0f0f0; font-size: 15px; line-height: 1.7; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                        {ai_signal_text.replace('\n', '<br>')}
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
                 except Exception as ai_err:
                     st.error(f"AI 智能决策请求失败: {ai_err}")
 

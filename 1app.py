@@ -9,6 +9,14 @@ import requests
 BUILTIN_API_KEY = "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" 
 # ==================================================================
 
+# 初始化模拟炒股账户资产 (Session State)
+if 'cash' not in st.session_state:
+    st.session_state.cash = 100000.0  # 初始虚拟资金 10万美元
+if 'portfolio' not in st.session_state:
+    st.session_state.portfolio = {}  # 格式: {ticker: {"shares": 数量, "avg_price": 均价}}
+if 'trade_history' not in st.session_state:
+    st.session_state.trade_history = []
+
 # 智能公司名称/代码转换函数（支持中文名搜索）
 def get_ticker_from_name(query):
     query = query.strip()
@@ -32,11 +40,11 @@ def get_stock_data(ticker, period):
     return df
 
 st.set_page_config(page_title="Financial Terminal", layout="wide")
-st.title(" AI Financial Terminal")
+st.title("📈 AI Financial Terminal (机构专业版 & 模拟交易)")
 
 # 侧边栏配置
 st.sidebar.header("配置")
-tickers_raw = st.sidebar.text_input("Name:", "Apple")
+tickers_raw = st.sidebar.text_input("输入公司名称或代码 (支持中英文，多个用逗号隔开):", "苹果, 腾讯")
 period = st.sidebar.selectbox("Time:", ["1D", "10D", "1mo", "3mo", "6mo", "1y", "10y", "20y"], index=2)
 normalize = st.sidebar.checkbox("开启归一化对比 (从0%起步)", value=True)
 
@@ -61,10 +69,9 @@ if st.sidebar.button("Analyse"):
                 tickers_input.append(resolved)
                 mapping_info.append(f"**{item}** ➔ `{resolved}`")
         
-        # 将原先刺眼的蓝色 info 框改为高级黑灰风格卡片
         st.markdown(f"""
         <div style="background-color: #1a1a1a; padding: 12px 18px; border-radius: 8px; border: 1px solid #333333; color: #f0f0f0; font-size: 14px; margin-bottom: 15px;">
-           {' | '.join(mapping_info)}
+            🔍 智能识别结果: {' | '.join(mapping_info)}
         </div>
         """, unsafe_allow_html=True)
 
@@ -115,6 +122,7 @@ if st.sidebar.button("Analyse"):
             df_primary['Signal'] = df_primary['MACD'].ewm(span=9, adjust=False).mean()
 
             latest = df_primary.iloc[-1]
+            current_price = float(latest['Close'])
 
             # --- 机构级专业 AI 量化投研看板 ---
             st.subheader(f"🤖 机构级 AI 量化投研看板: {primary_ticker}")
@@ -135,7 +143,6 @@ if st.sidebar.button("Analyse"):
 
                     tech_summary = f"RSI(14): {latest['RSI']:.2f}, MACD: {latest['MACD']:.2f}"
                     
-                    # 华尔街投研专家思维链（Chain of Thought）提示词
                     signal_prompt = f"""你是一位资深的华尔街量化投资经理与风险控制专家。请基于以下多维财务与技术数据，对 {primary_ticker} 进行严谨的专业量化评估：
 
 - 核心技术面 (近1个月): {tech_summary}
@@ -167,8 +174,8 @@ if st.sidebar.button("Analyse"):
                 except Exception as ai_err:
                     st.error(f"AI 智能决策请求失败: {ai_err}")
 
-            # 2. Tabs 分页
-            tab1, tab2, tab3 = st.tabs(["🏢 基本面分析", "📊 技术指标", "📋 数据预览"])
+            # 2. Tabs 分页（加入模拟交易 Tab）
+            tab1, tab2, tab3, tab4 = st.tabs(["🏢 基本面分析", "📊 技术指标", "📋 数据预览", "🪙 模拟交易 (Paper Trading)"])
 
             with tab1:
                 st.subheader(f"基本盘分析: {primary_ticker}")
@@ -204,6 +211,98 @@ if st.sidebar.button("Analyse"):
             with tab3:
                 st.subheader(f"{primary_ticker} 原始数据预览")
                 st.dataframe(df_primary.tail(10))
+
+            with tab4:
+                st.subheader("🪙 真实行情模拟炒股账户")
+                
+                # 计算当前持仓市值
+                total_stock_value = 0.0
+                portfolio_details = []
+                
+                for t, data in st.session_state.portfolio.items():
+                    shares = data["shares"]
+                    avg_price = data["avg_price"]
+                    # 获取该股票最新价
+                    latest_df = get_stock_data(t, "1D")
+                    cur_p = float(latest_df['Close'].iloc[-1]) if not latest_df.empty else avg_price
+                    market_val = shares * cur_p
+                    pnl = market_val - (shares * avg_price)
+                    pnl_pct = (pnl / (shares * avg_price)) * 100 if (shares * avg_price) > 0 else 0
+                    total_stock_value += market_val
+                    
+                    portfolio_details.append({
+                        "股票代码": t,
+                        "持仓数量": shares,
+                        "平均成本": f"${avg_price:.2f}",
+                        "当前价格": f"${cur_p:.2f}",
+                        "市值": f"${market_val:.2f}",
+                        "浮动盈亏": f"${pnl:.2f} ({pnl_pct:.2f}%)"
+                    })
+
+                total_assets = st.session_state.cash + total_stock_value
+                total_profit = total_assets - 100000.0
+                total_profit_pct = (total_profit / 100000.0) * 100
+
+                # 账户概览 Metrics
+                mcol1, mcol2, mcol3, mcol4 = st.columns(4)
+                mcol1.metric("账户总资产", f"${total_assets:,.2f}", f"{total_profit_pct:+.2f}%")
+                mcol2.metric("可用现金 (Cash)", f"${st.session_state.cash:,.2f}")
+                mcol3.metric("持仓市值", f"${total_stock_value:,.2f}")
+                mcol4.metric("累计盈亏", f"${total_profit:+,.2f}")
+
+                st.markdown("---")
+                
+                # 交易面板
+                st.write(f"### 🎯 快捷交易当前主标的: `{primary_ticker}` (最新价: **${current_price:.2f}**)")
+                
+                col_buy, col_sell = st.columns(2)
+                
+                with col_buy:
+                    st.markdown("#### 🟢 买入股票 (Buy)")
+                    buy_shares = st.number_input("买入股数", min_value=1, value=10, step=1, key="buy_shares")
+                    total_cost = buy_shares * current_price
+                    st.write(f"预计总花费: **${total_cost:,.2f}**")
+                    if st.button("确认买入"):
+                        if st.session_state.cash >= total_cost:
+                            st.session_state.cash -= total_cost
+                            if primary_ticker in st.session_state.portfolio:
+                                old_shares = st.session_state.portfolio[primary_ticker]["shares"]
+                                old_avg = st.session_state.portfolio[primary_ticker]["avg_price"]
+                                new_shares = old_shares + buy_shares
+                                new_avg = ((old_shares * old_avg) + total_cost) / new_shares
+                                st.session_state.portfolio[primary_ticker] = {"shares": new_shares, "avg_price": new_avg}
+                            else:
+                                st.session_state.portfolio[primary_ticker] = {"shares": buy_shares, "avg_price": current_price}
+                            st.success(f"成功买入 {buy_shares} 股 {primary_ticker}！")
+                            st.rerun()
+                        else:
+                            st.error("可用现金不足，无法买入！")
+
+                with col_sell:
+                    st.markdown("#### 🔴 卖出股票 (Sell)")
+                    owned_shares = st.session_state.portfolio.get(primary_ticker, {}).get("shares", 0)
+                    st.write(f"当前持有该股票数量: **{owned_shares} 股**")
+                    sell_shares = st.number_input("卖出股数", min_value=1, max_value=max(1, owned_shares), value=min(1, owned_shares), step=1, key="sell_shares")
+                    
+                    if st.button("确认卖出"):
+                        if owned_shares >= sell_shares > 0:
+                            earned_cash = sell_shares * current_price
+                            st.session_state.cash += earned_cash
+                            if owned_shares == sell_shares:
+                                del st.session_state.portfolio[primary_ticker]
+                            else:
+                                st.session_state.portfolio[primary_ticker]["shares"] -= sell_shares
+                            st.success(f"成功卖出 {sell_shares} 股 {primary_ticker}，获得现金 ${earned_cash:,.2f}！")
+                            st.rerun()
+                        else:
+                            st.error("持仓数量不足，无法卖出！")
+
+                st.markdown("---")
+                st.subheader("📦 当前持仓明细")
+                if portfolio_details:
+                    st.dataframe(pd.DataFrame(portfolio_details), use_container_width=True)
+                else:
+                    st.info("当前暂无持仓股票，快去上方买入体验吧！")
 
         except Exception as e:
             st.error(f"程序运行出错: {e}")

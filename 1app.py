@@ -337,3 +337,4 @@ elif app_mode == "🪙 模拟交易系统":
         st.dataframe(pd.DataFrame(portfolio_details), use_container_width=True)
     else:
        show_custom_alert("📦 No current holdings. Enter a ticker above to start paper trading!", "info")
+  

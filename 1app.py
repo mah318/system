@@ -307,7 +307,12 @@ if st.sidebar.button("Analyse"):
                     st.markdown(f"#### 🔴 卖出: `{resolved_trade_ticker}`")
                     owned_shares = st.session_state.portfolio.get(resolved_trade_ticker, {}).get("shares", 0)
                     st.write(f"当前持有该股票数量: **{owned_shares} 股**")
-                    sell_shares = st.number_input("卖出股数", min_value=1, max_value=max(1, owned_shares), value=min(1, owned_shares), step=1, key="ind_sell_shares")
+                    
+                    # 修复：持仓为0时避免 min_value 冲突报错
+                    if owned_shares > 0:
+                        sell_shares = st.number_input("卖出股数", min_value=1, max_value=owned_shares, value=1, step=1, key="ind_sell_shares")
+                    else:
+                        sell_shares = st.number_input("卖出股数", min_value=0, max_value=0, value=0, step=1, disabled=True, key="ind_sell_shares_disabled")
                     
                     if st.button("确认卖出此标的", key="btn_ind_sell"):
                         if owned_shares >= sell_shares > 0 and trade_price > 0:
@@ -320,7 +325,7 @@ if st.sidebar.button("Analyse"):
                             st.success(f"成功卖出 {sell_shares} 股 {resolved_trade_ticker}，获得现金 ${earned_cash:,.2f}！")
                             st.rerun()
                         else:
-                            st.error("持仓数量不足或价格无效，无法卖出！")
+                            st.error("持仓数量不足或当前无持仓，无法卖出！")
 
                 st.markdown("---")
                 st.subheader("📦 当前所有持仓明细")
@@ -329,5 +334,7 @@ if st.sidebar.button("Analyse"):
                 else:
                     st.info("当前暂无持仓股票，快在上方输入代码进行模拟交易吧！")
 
+        except Exception as e:
+            st.error(f"程序运行出错: {e}")
         except Exception as e:
             st.error(f"程序运行出错: {e}")

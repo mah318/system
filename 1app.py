@@ -9,7 +9,7 @@ import requests
 BUILTIN_API_KEY = "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" 
 # ==================================================================
 
-# 智能公司名称/代码转换函数
+# 智能公司名称/代码转换函数（支持中文名搜索）
 def get_ticker_from_name(query):
     query = query.strip()
     if not query:
@@ -32,9 +32,9 @@ def get_stock_data(ticker, period):
     return df
 
 st.set_page_config(page_title="Financial Terminal", layout="wide")
-st.title("📈 AI Financial Terminal")
+st.title("📈 AI Financial Terminal (机构专业版)")
 
-# 侧边栏配置（支持直接输入公司名称或代码）
+# 侧边栏配置
 st.sidebar.header("配置")
 tickers_raw = st.sidebar.text_input("Name:", "Apple")
 period = st.sidebar.selectbox("Time:", ["1D", "10D", "1mo", "3mo", "6mo", "1y", "10y", "20y"], index=2)
@@ -111,8 +111,8 @@ if st.sidebar.button("Analyse"):
 
             latest = df_primary.iloc[-1]
 
-            # --- AI 智能信号看板 ---
-            st.subheader(f"🤖 AI 智能决策看板: {primary_ticker}")
+            # --- 机构级专业 AI 量化投研看板 ---
+            st.subheader(f"🤖 机构级 AI 量化投研看板: {primary_ticker}")
             if not api_key or api_key == "你的API_KEY填在这里":
                 st.warning("检测到未正确配置 API Key，请修改代码中的 BUILTIN_API_KEY。")
             else:
@@ -128,20 +128,24 @@ if st.sidebar.button("Analyse"):
                             auto_model = m
                             break
 
-                    tech_summary = f"RSI: {latest['RSI']:.2f}, MACD: {latest['MACD']:.2f}"
+                    tech_summary = f"RSI(14): {latest['RSI']:.2f}, MACD: {latest['MACD']:.2f}"
                     
-                    signal_prompt = f"""你是一个顶尖的量化交易员。请根据以下**近1个月的精确数据**对 {primary_ticker} 进行客观、纯数据驱动的推断：
-- 短期技术面: {tech_summary}
+                    # 华尔街投研专家思维链（Chain of Thought）提示词
+                    signal_prompt = f"""你是一位资深的华尔街量化投资经理与风险控制专家。请基于以下多维财务与技术数据，对 {primary_ticker} 进行严谨的专业量化评估：
+
+- 核心技术面 (近1个月): {tech_summary}
 - 核心基本面: PE市盈率={pe_str}, PB市净率={pb_str}, 利润率={margin_str}, 营收增长={growth_str}
 
-硬性要求：
-1. **严禁空洞废话**：所有结论必须直接扣紧上述给出的具体数字（如具体的 RSI 点位、PE 高低、利润率百分比）来进行逻辑推导。
-2. **拒绝模棱两可**：禁止使用“观望”或骑墙态度，必须基于多空数据对比，在“买入”或“卖出”中明确二选一。
+请遵循以下专业分析步骤（Chain of Thought）：
+1. 【多头逻辑】：结合上述数据，寻找支撑该股票的正面逻辑（如成长性、估值优势或技术面动能）。
+2. 【空头风险】：结合上述数据，寻找潜在的下行风险或估值泡沫。
+3. 【综合裁决】：综合多空力量，给出客观评级。
 
-严格按以下格式输出：
-【操作评级】买入 / 卖出 (二选一)
-【核心理由】(40字以内，必须包含具体数据支撑)
-【关键支撑与风险】(各一句话，严格对应指标数据)
+请严格按照以下格式输出：
+【操作评级】强烈买入 / 买入 / 持有观望 / 减持 / 卖出 (五选一)
+【置信度评分】(1-10分，评估你对该判断的确信程度)
+【多空博弈核心逻辑】(60字以内，必须结合具体数字说明)
+【关键支撑与风控点】(各一句话，严格对应指标数据)
 """
                     signal_response = client.chat.completions.create(
                         model=auto_model,

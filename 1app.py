@@ -5,6 +5,10 @@ from openai import OpenAI
 import pandas as pd
 import requests
 
+# ==================== 在这里直接内置你的 API Key ====================
+BUILTIN_API_KEY = "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" 
+# ==================================================================
+
 # 智能公司名称/代码转换函数
 def get_ticker_from_name(query):
     query = query.strip()
@@ -30,17 +34,17 @@ def get_stock_data(ticker, period):
 st.set_page_config(page_title="Financial Terminal", layout="wide")
 st.title("📈 AI Financial Terminal")
 
-# 侧边栏配置（现在支持直接打公司名字）
+# 侧边栏配置（支持直接输入公司名称或代码）
 st.sidebar.header("配置")
 tickers_raw = st.sidebar.text_input("Name:", "Apple")
 period = st.sidebar.selectbox("Time:", ["1D", "10D", "1mo", "3mo", "6mo", "1y", "10y", "20y"], index=2)
 normalize = st.sidebar.checkbox("开启归一化对比 (从0%起步)", value=True)
 
-# 自动从系统配置中读取内置的 API Key
+# 优先从 secrets 读取，若无则使用上方定义的 BUILTIN_API_KEY
 try:
-    BUILTIN_API_KEY = st.secrets["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"]
+    api_key = st.secrets["GROQ_API_KEY"]
 except:
-    BUILTIN_API_KEY = ""
+    api_key = BUILTIN_API_KEY
 
 if st.sidebar.button("Analyse"):
     raw_inputs = [t.strip() for t in tickers_raw.split(',') if t.strip()]
@@ -109,11 +113,11 @@ if st.sidebar.button("Analyse"):
 
             # --- AI 智能信号看板 ---
             st.subheader(f"🤖 AI 智能决策看板: {primary_ticker}")
-            if not BUILTIN_API_KEY:
-                st.warning("未检测到内置 API Key，请检查 .streamlit/secrets.toml 文件是否配置正确。")
+            if not api_key or api_key == "你的API_KEY填在这里":
+                st.warning("检测到未正确配置 API Key，请修改代码中的 BUILTIN_API_KEY。")
             else:
                 try:
-                    client = OpenAI(api_key=BUILTIN_API_KEY, base_url="https://api.groq.com/openai/v1")
+                    client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
                     
                     models_response = client.models.list()
                     available_models = [m.id for m in models_response.data]
@@ -170,7 +174,7 @@ if st.sidebar.button("Analyse"):
                 
                 st.markdown("---")
                 st.write("**🤖 AI 基本盘深度评估:**")
-                if BUILTIN_API_KEY:
+                if api_key and api_key != "你的API_KEY填在这里":
                     try:
                         fund_prompt = f"基于 {primary_ticker} 的硬性数据（PE: {pe_str}, PB: {pb_str}, 利润率: {margin_str}, 营收增长: {growth_str}），请用数据推导列出5项核心基本面评价。"
                         fund_response = client.chat.completions.create(
@@ -181,7 +185,7 @@ if st.sidebar.button("Analyse"):
                     except:
                         st.write("基本面 AI 评估加载失败。")
                 else:
-                    st.info("请先配置 API Key 以查看 AI 深度评估。")
+                    st.info("请先配置 API Key 以查看 AI 评估。")
 
             with tab2:
                 st.subheader(f"技术指标 (近1个月): {primary_ticker}")

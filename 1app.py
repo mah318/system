@@ -13,11 +13,11 @@ def get_stock_data(ticker, period):
 st.set_page_config(page_title="Financial Terminal", layout="wide")
 st.title("📈 AI Financial Terminal")
 
-# 侧边栏配置（默认时间已设为 1mo 一个月）
+# 侧边栏配置（默认时间已设为 10D 两个星期）
 st.sidebar.header("配置")
 api_key = st.sidebar.text_input("API Key:", type="password")
 tickers_raw = st.sidebar.text_input("Enter Stock:", "NVDA")
-period = st.sidebar.selectbox("Time:", ["1D", "10D", "1mo", "3mo", "6mo", "1y", "10y", "20y"], index=2)
+period = st.sidebar.selectbox("Time:", ["1D", "10D", "1mo", "3mo", "6mo", "1y", "10y", "20y"], index=1)
 normalize = st.sidebar.checkbox("开启归一化对比 (从0%起步)", value=True)
 
 if st.sidebar.button("Analyse"):
@@ -74,7 +74,7 @@ if st.sidebar.button("Analyse"):
 
             latest = df_primary.iloc[-1]
 
-            # --- AI 智能信号看板 ---
+            # --- AI 智能信号看板 (强化倾向性，禁止模棱两可) ---
             st.subheader(f"🤖 AI 智能决策看板: {primary_ticker}")
             if not api_key:
                 st.warning("未输入 API Key，已跳过 AI 智能分析。")
@@ -92,13 +92,14 @@ if st.sidebar.button("Analyse"):
                             break
 
                     tech_summary = f"Ticker: {primary_ticker}, RSI: {latest['RSI']:.2f}, MACD: {latest['MACD']:.2f}"
-                    signal_prompt = f"""请根据以下近一个月数据对 {primary_ticker} 进行极简分析：
+                    signal_prompt = f"""请根据以下近两周数据对 {primary_ticker} 进行果断、犀利的分析：
 - 技术面: {tech_summary}
 - 基本面: PE={pe_str}, PB={pb_str}, 利润率={margin_str}, 营收增长={growth_str}
 
+要求：必须表现出鲜明的观点，**严禁无脑观望或模棱两可**，根据多空指标强制倾向于“买入”或“卖出”其中之一。
 严格按以下格式输出：
-【操作评级】买入 / 观望 / 卖出 (三选一)
-【核心理由】(40字以内)
+【操作评级】买入 / 卖出 (二选一，必须明确)
+【核心理由】(40字以内，直击要害)
 【关键支撑与风险】(各一句话)
 """
                     signal_response = client.chat.completions.create(
@@ -147,7 +148,7 @@ if st.sidebar.button("Analyse"):
                     st.info("请输入 API Key 以查看 AI 深度评估。")
 
             with tab2:
-                st.subheader(f"技术指标 (近1个月): {primary_ticker}")
+                st.subheader(f"技术指标 (近两周): {primary_ticker}")
                 st.line_chart(df_primary[['RSI']])
                 st.line_chart(df_primary[['MACD', 'Signal']])
 

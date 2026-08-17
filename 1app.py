@@ -15,7 +15,7 @@ if 'cash' not in st.session_state:
 if 'portfolio' not in st.session_state:
     st.session_state.portfolio = {}  # 格式: {ticker: {"shares": 数量, "avg_price": 均价}}
 
-# 统一的暗黑主题提示框函数（确保所有提示颜色完全一致）
+# 统一的暗黑主题提示框函数
 def show_custom_alert(text, alert_type="info"):
     colors = {
         "info": "#a0a0a0",
@@ -91,7 +91,6 @@ if app_mode == "📊 机构研报与数据分析":
         """, unsafe_allow_html=True)
 
         try:
-            # 1. 绘图与对比
             fig = go.Figure()
             for t in tickers_input:
                 df = get_stock_data(t, period)
@@ -102,7 +101,6 @@ if app_mode == "📊 机构研报与数据分析":
             fig.update_layout(template="plotly_dark", title="收益率对比" if normalize else "价格对比")
             st.plotly_chart(fig, use_container_width=True)
 
-            # 准备主分析对象的数据
             primary_ticker = tickers_input[0]
             df_primary = get_stock_data(primary_ticker, period)
             if df_primary.empty:
@@ -110,8 +108,6 @@ if app_mode == "📊 机构研报与数据分析":
                 st.stop()
                 
             stock_primary = yf.Ticker(primary_ticker)
-            
-            # 获取基本面核心指标
             info = stock_primary.info
             raw_market_cap = info.get('marketCap', 'N/A')
             raw_pe = info.get('trailingPE', 'N/A')
@@ -125,7 +121,6 @@ if app_mode == "📊 机构研报与数据分析":
             margin_str = f"{raw_margin * 100:.2f}%" if isinstance(raw_margin, (int, float)) else "N/A"
             growth_str = f"{raw_growth * 100:.2f}%" if isinstance(raw_growth, (int, float)) else "N/A"
             
-            # 计算技术指标
             delta = df_primary['Close'].diff()
             gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
             loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
@@ -138,7 +133,6 @@ if app_mode == "📊 机构研报与数据分析":
 
             latest = df_primary.iloc[-1]
 
-            # --- 机构级专业 AI 量化投研看板 ---
             st.subheader(f"Dashboard: {primary_ticker}")
             if not api_key or api_key == "你的API_KEY填在这里":
                 show_custom_alert("检测到未正确配置 API Key，请修改代码中的 BUILTIN_API_KEY。", "warning")
@@ -188,7 +182,6 @@ if app_mode == "📊 机构研报与数据分析":
                 except Exception as ai_err:
                     show_custom_alert(f"AI 智能决策请求失败: {ai_err}", "error")
 
-            # 研报内部 Tabs 分页
             tab1, tab2, tab3 = st.tabs(["🏢 基本面分析", "📊 技术指标", "📋 数据预览"])
 
             with tab1:
@@ -230,16 +223,14 @@ if app_mode == "📊 机构研报与数据分析":
             show_custom_alert(f"程序运行出错: {e}", "error")
 
 elif app_mode == "🪙 模拟交易系统":
-    st.subheader("🪙 独立模拟交易与资产管理系统")
+    st.subheader("🪙 模拟交易与资产管理系统")
     st.write("此模块与左侧研报数据**完全独立**。你可以随时输入任意股票代码进行虚拟买入和卖出，随时追踪资产盈亏。")
     
-    # 独立选择交易标的
     col_tinput, col_tinfo = st.columns([2, 3])
     with col_tinput:
         trade_query = st.text_input("输入要交易的股票代码/名称:", "AAPL", key="independent_trade_ticker")
         resolved_trade_ticker = get_ticker_from_name(trade_query)
     
-    # 获取独立交易标的的实时价格
     trade_price = 0.0
     if resolved_trade_ticker:
         try:
@@ -259,7 +250,6 @@ elif app_mode == "🪙 模拟交易系统":
 
     st.markdown("---")
 
-    # 计算当前持仓市值
     total_stock_value = 0.0
     portfolio_details = []
     
@@ -286,7 +276,6 @@ elif app_mode == "🪙 模拟交易系统":
     total_profit = total_assets - 100000.0
     total_profit_pct = (total_profit / 100000.0) * 100
 
-    # 账户概览 Metrics
     mcol1, mcol2, mcol3, mcol4 = st.columns(4)
     mcol1.metric("账户总资产", f"${total_assets:,.2f}", f"{total_profit_pct:+.2f}%")
     mcol2.metric("可用现金 (Cash)", f"${st.session_state.cash:,.2f}")
@@ -295,7 +284,6 @@ elif app_mode == "🪙 模拟交易系统":
 
     st.markdown("---")
     
-    # 交易买卖下单面板
     col_buy, col_sell = st.columns(2)
     
     with col_buy:

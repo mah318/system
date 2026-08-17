@@ -11,7 +11,7 @@ def get_stock_data(ticker, period):
     return df
 
 st.set_page_config(page_title="Financial Terminal", layout="wide")
-st.title("📈 AI Financial Terminal (精简投研版)")
+st.title("📈 AI Financial Terminal")
 
 # 侧边栏配置
 st.sidebar.header("配置")
@@ -43,30 +43,21 @@ if st.sidebar.button("Analyse"):
             df_primary = get_stock_data(primary_ticker, period)
             stock_primary = yf.Ticker(primary_ticker)
             
-            # 获取基本面与市场数据
+            # 获取基本面核心指标并做美化处理
             info = stock_primary.info
-            fin_data = {
-                "market_cap": info.get('marketCap', 'N/A'),
-                "pe": info.get('trailingPE', 'N/A'),
-                "forward_pe": info.get('forwardPE', 'N/A'),
-                "pb": info.get('priceToBook', 'N/A'),
-                "profit_margin": info.get('profitMargins', 'N/A'),
-                "revenue_growth": info.get('revenueGrowth', 'N/A'),
-                "roe": info.get('returnOnEquity', 'N/A'),
-                "debt_to_equity": info.get('debtToEquity', 'N/A'),
-                "beta": info.get('beta', 'N/A'),
-                "dividend_yield": info.get('dividendYield', 'N/A'),
-                "target_price": info.get('targetMeanPrice', 'N/A'),
-                "recommendation": info.get('recommendationKey', 'N/A')
-            }
+            raw_market_cap = info.get('marketCap', 'N/A')
+            raw_pe = info.get('trailingPE', 'N/A')
+            raw_pb = info.get('priceToBook', 'N/A')
+            raw_margin = info.get('profitMargins', 'N/A')
+            raw_growth = info.get('revenueGrowth', 'N/A')
             
-            market_cap_str = f"{fin_data['market_cap']:,}" if isinstance(fin_data['market_cap'], (int, float)) else str(fin_data['market_cap'])
+            market_cap_str = f"{raw_market_cap:,}" if isinstance(raw_market_cap, (int, float)) else str(raw_market_cap)
+            pe_str = f"{raw_pe:.2f}" if isinstance(raw_pe, (int, float)) else str(raw_pe)
+            pb_str = f"{raw_pb:.2f}" if isinstance(raw_pb, (int, float)) else str(raw_pb)
+            margin_str = f"{raw_margin * 100:.2f}%" if isinstance(raw_margin, (int, float)) else "N/A"
+            growth_str = f"{raw_growth * 100:.2f}%" if isinstance(raw_growth, (int, float)) else "N/A"
             
             # 计算技术指标
-            current_price = df_primary['Close'].iloc[-1]
-            start_price = df_primary['Close'].iloc[0]
-            period_return = ((current_price - start_price) / start_price) * 100
-            
             delta = df_primary['Close'].diff()
             gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
             loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
@@ -77,56 +68,64 @@ if st.sidebar.button("Analyse"):
             df_primary['MACD'] = ema12 - ema26
             df_primary['Signal'] = df_primary['MACD'].ewm(span=9, adjust=False).mean()
 
-            latest = df_primary.iloc[-1]
-
-            news = stock_primary.news
-            headlines = []
-            if news and isinstance(news, list):
-                headlines = [n.get('title', '无标题新闻') for n in news[:8]]
-
-            # --- AI 核心决策与精简诊断 ---
-            client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
-            
-            summary_prompt = f"""你是一位华尔街资深量化分析师。请根据以下数据对 {primary_ticker} 进行极简、高效的评级。
-【数据】
-- 当前价格: {current_price:.2f} (区间涨跌: {period_return:.2f}%)
-- RSI: {latest['RSI']:.2f}, MACD: {latest['MACD']:.2f}
-- PE: {fin_data['pe']}, PB: {fin_data['pb']}, ROE: {fin_data['roe']}
-- 分析师评级倾向: {fin_data['recommendation']} (目标价: {fin_data['target_price']})
-- 近期新闻: {', '.join(headlines[:3])}
-
-请严格按以下格式输出，字数精炼：
-【操作评级】买入 / 观望 / 卖出 (三选一，必须明确)
-【一句话核心理由】(控制在30字以内)
-【关键支撑与风险】(分两点，每点一句话)
-"""
-            response = client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=[{"role": "user", "content": summary_prompt}]
-            )
-            ai_output = response.choices[0].message.content
-            st.session_state['analysis_result'] = ai_output
-
-            # 顶层醒目展示 AI 信号
-            st.subheader(f"🤖 AI 智能决策看板: {primary_ticker}")
-            st.info(ai_output)
+            # --- AI 智能诊断 (技术面) ---
+            with st.expander("🤖 AI 技术面智能诊断", expanded=True):
+                latest = df_primary.iloc[-1]
+                tech_summary = f"Ticker: {primary_ticker}, RSI: {latest['RSI']:.2f}, MACD: {latest['MACD']:.2f}, Signal: {latest['Signal']:.2f}"
+                
+                client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
+                diag_prompt = f"请严格参照以下格式分析技术指标数据：\n1. 指标名称: 数值\n   - 详细分析说明\n数据内容：{tech_summary}"
+                response = client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    messages=[{"role": "user", "content": diag_prompt}]
+                )
+                st.write(response.choices[0].message.content)
 
             # 2. Tabs 分页
             tab1, tab2, tab3, tab4, tab5 = st.tabs(["🏢 基本面分析", "📊 技术指标", "📰 情绪分析", "📝 生成报告", "📋 数据预览"])
 
             with tab1:
-                st.subheader("核心基本面指标")
-                col1, col2, col3, col4 = st.columns(4)
-                col1.metric("市值", market_cap_str)
-                col2.metric("市盈率 (PE)", str(fin_data['pe']))
-                col3.metric("市净率 (PB)", str(fin_data['pb']))
-                col4.metric("ROE", str(fin_data['roe']))
+                st.subheader(f"基本盘分析: {primary_ticker}")
                 
-                col5, col6, col7, col8 = st.columns(4)
-                col5.metric("利润率", str(fin_data['profit_margin']))
-                col6.metric("营收增长", str(fin_data['revenue_growth']))
-                col7.metric("贝塔 Beta", str(fin_data['beta']))
-                col8.metric("分析师目标价", str(fin_data['target_price']))
+                # 数据指标展示卡片
+                col1, col2, col3 = st.columns(3)
+                col1.metric("市值 (Market Cap)", market_cap_str)
+                col2.metric("市盈率 (P/E)", pe_str)
+                col3.metric("市净率 (P/B)", pb_str)
+                
+                col4, col5 = st.columns(2)
+                col4.metric("利润率 (Profit Margin)", margin_str)
+                col5.metric("营收增长率 (Revenue Growth)", growth_str)
+                
+                st.markdown("---")
+                st.write("**🤖 AI 基本盘深度评估:**")
+                
+                # 优化后的结构化 Prompt，强制 AI 采用类似第二张图的清爽排版
+                fund_prompt = f"""请对 {primary_ticker} 进行基本面分析评估。
+以下是核心财务指标数据：
+- 市值: {market_cap_str}
+- 市盈率 (P/E): {pe_str}
+- 市净率 (P/B): {pb_str}
+- 利润率: {margin_str}
+- 营收增长率: {growth_str}
+
+请严格使用以下带序号和缩进圆点的排版格式进行输出，切勿输出一大段长文：
+1. 市值: {market_cap_str}
+   - [在这里分析其规模、稳定性和市场地位]
+2. 市盈率 (P/E): {pe_str}
+   - [在这里分析其估值水平和投资性价比]
+3. 市净率 (P/B): {pb_str}
+   - [在这里分析资产状况和泡沫风险]
+4. 利润率: {margin_str}
+   - [在这里分析盈利能力和成本控制]
+5. 营收增长率: {growth_str}
+   - [在这里分析成长潜力和业务扩张]
+"""
+                fund_response = client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    messages=[{"role": "user", "content": fund_prompt}]
+                )
+                st.info(fund_response.choices[0].message.content)
 
             with tab2:
                 st.subheader(f"技术指标: {primary_ticker}")
@@ -134,22 +133,25 @@ if st.sidebar.button("Analyse"):
                 st.line_chart(df_primary[['MACD', 'Signal']])
 
             with tab3:
-                st.subheader("精选市场新闻")
-                if headlines:
-                    for h in headlines: 
-                        st.write(f"- {h}")
-                else:
-                    st.warning("暂无新闻数据。")
+                st.subheader("新闻情绪分析")
+                news = stock_primary.news
+                if news and isinstance(news, list):
+                    headlines = [n.get('title', '无标题新闻') for n in news[:5]]
+                    for h in headlines: st.write(f"- {h}")
+                    
+                    if headlines:
+                        sentiment_prompt = f"分析关于 {primary_ticker} 的新闻标题，判断市场情绪：\n{', '.join(headlines)}"
+                        sentiment_response = client.chat.completions.create(
+                            model="llama-3.3-70b-versatile",
+                            messages=[{"role": "user", "content": sentiment_prompt}]
+                        )
+                        st.info(sentiment_response.choices[0].message.content)
+                        st.session_state['analysis_result'] = sentiment_response.choices[0].message.content
 
             with tab4:
                 st.subheader("一键导出报告")
                 if 'analysis_result' in st.session_state:
-                    st.download_button(
-                        label="下载投研摘要 (TXT)",
-                        data=st.session_state['analysis_result'],
-                        file_name=f"{primary_ticker}_signal_report.txt",
-                        mime="text/plain"
-                    )
+                    st.download_button("下载分析报告", data=st.session_state['analysis_result'], file_name=f"{primary_ticker}_analysis.txt")
             
             with tab5:
                 st.subheader(f"{primary_ticker} 原始数据预览")

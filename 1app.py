@@ -13,15 +13,12 @@ def get_stock_data(ticker, period):
 st.set_page_config(page_title="Financial Terminal", layout="wide")
 st.title("📈 AI Financial Terminal")
 
-# 侧边栏配置（已移除所有复杂的下拉选择）
+# 侧边栏配置（无需选择模型，完全自动化）
 st.sidebar.header("配置")
 api_key = st.sidebar.text_input("API Key:", type="password")
 tickers_raw = st.sidebar.text_input("Enter Stock:", "AAPL")
 period = st.sidebar.selectbox("Time:", ["1D", "10D", "1mo", "3mo", "6mo", "1y", "10y", "20y"])
 normalize = st.sidebar.checkbox("开启归一化对比 (从0%起步)", value=True)
-
-# 内置稳定模型，无需手动选择
-DEFAULT_MODEL = "llama-3.3-70b-versatile"
 
 if st.sidebar.button("Analyse"):
     tickers_input = [t.strip().upper() for t in tickers_raw.split(',') if t.strip()]
@@ -77,13 +74,24 @@ if st.sidebar.button("Analyse"):
 
             latest = df_primary.iloc[-1]
 
-            # --- AI 智能信号看板 ---
+            # --- AI 智能信号看板 (自动检测并使用你账号支持的模型) ---
             st.subheader(f"🤖 AI 智能决策看板: {primary_ticker}")
             if not api_key:
                 st.warning("未输入 API Key，已跳过 AI 智能分析。")
             else:
                 try:
                     client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
+                    
+                    # 自动获取账号下可用的模型并智能选择
+                    models_response = client.models.list()
+                    available_models = [m.id for m in models_response.data]
+                    
+                    auto_model = available_models[0] if available_models else "openai/gpt-oss-120b"
+                    for m in available_models:
+                        if any(k in m.lower() for k in ['chat', 'versatile', 'instant', '8b', '70b', 'gpt-oss', 'instruct']):
+                            auto_model = m
+                            break
+
                     tech_summary = f"Ticker: {primary_ticker}, RSI: {latest['RSI']:.2f}, MACD: {latest['MACD']:.2f}"
                     signal_prompt = f"""请根据以下数据对 {primary_ticker} 进行极简分析：
 - 技术面: {tech_summary}
@@ -95,7 +103,7 @@ if st.sidebar.button("Analyse"):
 【关键支撑与风险】(各一句话)
 """
                     signal_response = client.chat.completions.create(
-                        model=DEFAULT_MODEL,
+                        model=auto_model,
                         messages=[{"role": "user", "content": signal_prompt}]
                     )
                     ai_signal_text = signal_response.choices[0].message.content
@@ -124,7 +132,7 @@ if st.sidebar.button("Analyse"):
                     try:
                         fund_prompt = f"请对 {primary_ticker} 进行简要基本面评估（PE: {pe_str}, PB: {pb_str}, 利润率: {margin_str}），分点列出5项核心指标评价。"
                         fund_response = client.chat.completions.create(
-                            model=DEFAULT_MODEL,
+                            model=auto_model,
                             messages=[{"role": "user", "content": fund_prompt}]
                         )
                         st.write(fund_response.choices[0].message.content)

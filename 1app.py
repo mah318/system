@@ -32,7 +32,7 @@ def get_stock_data(ticker, period):
     return df
 
 st.set_page_config(page_title="Financial Terminal", layout="wide")
-st.title("📈 AI Financial Terminal (机构专业版)")
+st.title("📈 AI Financial Terminal ")
 
 # 侧边栏配置
 st.sidebar.header("配置")

@@ -68,18 +68,29 @@ if st.sidebar.button("Analyse"):
             df_primary['MACD'] = ema12 - ema26
             df_primary['Signal'] = df_primary['MACD'].ewm(span=9, adjust=False).mean()
 
-            # --- AI 智能诊断 (技术面) ---
-            with st.expander("🤖 AI 技术面智能诊断", expanded=True):
-                latest = df_primary.iloc[-1]
-                tech_summary = f"Ticker: {primary_ticker}, RSI: {latest['RSI']:.2f}, MACD: {latest['MACD']:.2f}, Signal: {latest['Signal']:.2f}"
-                
-                client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
-                diag_prompt = f"请严格参照以下格式分析技术指标数据：\n1. 指标名称: 数值\n   - 详细分析说明\n数据内容：{tech_summary}"
-                response = client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
-                    messages=[{"role": "user", "content": diag_prompt}]
-                )
-                st.write(response.choices[0].message.content)
+            latest = df_primary.iloc[-1]
+            client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
+
+            # --- AI 智能信号看板 (顶层直接给出买入/观望/卖出评级与精简理由) ---
+            tech_summary = f"Ticker: {primary_ticker}, RSI: {latest['RSI']:.2f}, MACD: {latest['MACD']:.2f}, Signal: {latest['Signal']:.2f}"
+            signal_prompt = f"""请根据以下数据对 {primary_ticker} 进行极简的投资决策分析：
+- 技术面: {tech_summary}
+- 基本面: PE={pe_str}, PB={pb_str}, 利润率={margin_str}, 营收增长={growth_str}
+
+请严格按以下格式输出，字数精炼：
+【操作评级】买入 / 观望 / 卖出 (三选一)
+【核心理由】(控制在40字以内)
+【关键支撑与风险】(各一句话)
+"""
+            signal_response = client.chat.completions.create(
+                model="llama-3.1-70b-versatile",
+                messages=[{"role": "user", "content": signal_prompt}]
+            )
+            ai_signal_text = signal_response.choices[0].message.content
+            st.session_state['analysis_result'] = ai_signal_text
+
+            st.subheader(f"🤖 AI 智能决策看板: {primary_ticker}")
+            st.info(ai_signal_text)
 
             # 2. Tabs 分页
             tab1, tab2, tab3, tab4, tab5 = st.tabs(["🏢 基本面分析", "📊 技术指标", "📰 情绪分析", "📝 生成报告", "📋 数据预览"])
@@ -87,7 +98,6 @@ if st.sidebar.button("Analyse"):
             with tab1:
                 st.subheader(f"基本盘分析: {primary_ticker}")
                 
-                # 数据指标展示卡片
                 col1, col2, col3 = st.columns(3)
                 col1.metric("市值 (Market Cap)", market_cap_str)
                 col2.metric("市盈率 (P/E)", pe_str)
@@ -100,32 +110,26 @@ if st.sidebar.button("Analyse"):
                 st.markdown("---")
                 st.write("**🤖 AI 基本盘深度评估:**")
                 
-                # 优化后的结构化 Prompt，强制 AI 采用类似第二张图的清爽排版
-                fund_prompt = f"""请对 {primary_ticker} 进行基本面分析评估。
-以下是核心财务指标数据：
-- 市值: {market_cap_str}
-- 市盈率 (P/E): {pe_str}
-- 市净率 (P/B): {pb_str}
-- 利润率: {margin_str}
-- 营收增长率: {growth_str}
+                fund_prompt = f"""请对 {primary_ticker} 进行基本面分析评估。核心财务指标：
+- 市值: {market_cap_str}, PE: {pe_str}, PB: {pb_str}, 利润率: {margin_str}, 营收增长: {growth_str}
 
-请严格使用以下带序号和缩进圆点的排版格式进行输出，切勿输出一大段长文：
+请使用带序号和缩进的清爽排版：
 1. 市值: {market_cap_str}
-   - [在这里分析其规模、稳定性和市场地位]
+   - 分析其规模与市场地位
 2. 市盈率 (P/E): {pe_str}
-   - [在这里分析其估值水平和投资性价比]
+   - 分析估值水平与性价比
 3. 市净率 (P/B): {pb_str}
-   - [在这里分析资产状况和泡沫风险]
+   - 分析资产状况与风险
 4. 利润率: {margin_str}
-   - [在这里分析盈利能力和成本控制]
+   - 分析盈利与成本控制
 5. 营收增长率: {growth_str}
-   - [在这里分析成长潜力和业务扩张]
+   - 分析成长潜力
 """
                 fund_response = client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
+                    model="llama-3.1-70b-versatile",
                     messages=[{"role": "user", "content": fund_prompt}]
                 )
-                st.info(fund_response.choices[0].message.content)
+                st.write(fund_response.choices[0].message.content)
 
             with tab2:
                 st.subheader(f"技术指标: {primary_ticker}")
@@ -140,13 +144,12 @@ if st.sidebar.button("Analyse"):
                     for h in headlines: st.write(f"- {h}")
                     
                     if headlines:
-                        sentiment_prompt = f"分析关于 {primary_ticker} 的新闻标题，判断市场情绪：\n{', '.join(headlines)}"
+                        sentiment_prompt = f"分析关于 {primary_ticker} 的新闻标题，判断市场情绪（精炼）：\n{', '.join(headlines)}"
                         sentiment_response = client.chat.completions.create(
-                            model="llama-3.3-70b-versatile",
+                            model="llama-3.1-70b-versatile",
                             messages=[{"role": "user", "content": sentiment_prompt}]
                         )
                         st.info(sentiment_response.choices[0].message.content)
-                        st.session_state['analysis_result'] = sentiment_response.choices[0].message.content
 
             with tab4:
                 st.subheader("一键导出报告")

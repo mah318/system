@@ -127,7 +127,7 @@ except:
 
 # 侧边栏：独立的功能模块切换器
 st.sidebar.header("Function")
-app_mode = st.sidebar.radio("Select Mode", ["📊 Data Analysis", "🪙 Trading System", "⚔️ AI Comparison (PK)", "🏆 Top 50 Companies"])
+app_mode = st.sidebar.radio("Select Mode", ["📊 Data Analysis", "🪙 Trading System", "⚔️ Companies Comparison", "🏆 Top 50 Companies"])
 
 if app_mode == "📊 Data Analysis":
     st.sidebar.header("Report Parameters")
@@ -313,7 +313,7 @@ if app_mode == "📊 Data Analysis":
             show_custom_alert(f"程序运行出错: {e}", "error")
 
 elif app_mode == "🪙 Trading System":
-    st.subheader("🪙 Trading & Quantitative Backtest")
+    st.subheader("🪙 Trading")
     
     col_tinput, col_tinfo = st.columns([2, 3])
     with col_tinput:

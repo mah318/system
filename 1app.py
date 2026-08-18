@@ -80,20 +80,31 @@ def get_stock_data(ticker, period):
     except Exception:
         return pd.DataFrame()
 
+# 获取股票最新新闻标题
+def get_stock_news(ticker):
+    try:
+        stock = yf.Ticker(ticker)
+        news = stock.news
+        titles = []
+        if news:
+            for item in news:
+                title = item.get('title') or item.get('content', {}).get('title')
+                if title:
+                    titles.append(title)
+        return titles[:5]
+    except:
+        return []
+
 # 计算最大回撤与夏普比率辅助函数
 def calculate_risk_metrics(returns_series):
     if returns_series.empty or len(returns_series) < 2:
         return 0.0, 0.0
     
-    # 计算累计收益率曲线
     cum_returns = (1 + returns_series).cumprod()
-    # 计算历史最高点
     peak = cum_returns.cummax()
-    # 计算回撤
     drawdown = (cum_returns - peak) / peak
-    max_drawdown = float(drawdown.min()) * 100  # 转为百分比
+    max_drawdown = float(drawdown.min()) * 100
     
-    # 计算年化夏普比率 (假设无风险利率为 0%，每年 252 个交易日)
     mean_daily_return = returns_series.mean()
     std_daily_return = returns_series.std()
     
@@ -115,7 +126,7 @@ except:
 
 # 侧边栏：独立的功能模块切换器
 st.sidebar.header("Function")
-app_mode = st.sidebar.radio("Select Mode", ["📊 Data Analysis", "🪙 Trading Syestem", "🏆 Top 50 Companies"])
+app_mode = st.sidebar.radio("Select Mode", ["📊 Data Analysis", "🪙 Trading System", "⚔️ AI Comparison (PK)", "🏆 Top 50 Companies"])
 
 if app_mode == "📊 Data Analysis":
     st.sidebar.header("Report Parameters")
@@ -234,6 +245,42 @@ if app_mode == "📊 Data Analysis":
                 except Exception as ai_err:
                     show_custom_alert(f"AI 智能决策请求失败: {ai_err}", "error")
 
+            # 新增功能：实时新闻舆情分析模块
+            st.markdown("---")
+            st.subheader(f"📰 News Sentiment & Analysis: {primary_ticker}")
+            news_titles = get_stock_news(primary_ticker)
+            if news_titles:
+                st.write("**最新相关新闻标题：**")
+                for title in news_titles:
+                    st.markdown(f"- {title}")
+                
+                if api_key and api_key != "你的API_KEY填在这里":
+                    try:
+                        news_prompt = f"""请基于以下关于股票 {primary_ticker} 的最新新闻标题，进行专业的情感分析与舆情评估：
+新闻列表：
+{chr(10).join([f'- {t}' for t in news_titles])}
+
+请严格按以下格式输出：
+【舆情情感倾向】正面 / 中性 / 负面 (三选一)
+【舆情综合得分】(0-100分，分越高代表情绪越乐观)
+【核心事件与市场影响总结】(80字以内，分析这些新闻对股价的潜在短期影响)
+"""
+                        news_response = client.chat.completions.create(
+                            model=auto_model,
+                            messages=[{"role": "user", "content": news_prompt}]
+                        )
+                        st.markdown(f"""
+                        <div style="background-color: #1a1a1a; padding: 16px; border-radius: 8px; border: 1px solid #333333; color: #f0f0f0; font-size: 14px; line-height: 1.6;">
+                            {news_response.choices[0].message.content.replace('\n', '<br>')}
+                        </div>
+                        """, unsafe_allow_html=True)
+                    except Exception as e:
+                        show_custom_alert(f"新闻舆情 AI 分析失败: {e}", "warning")
+                else:
+                    show_custom_alert("请配置 API Key 以启用 AI 新闻舆情情感打分功能。", "warning")
+            else:
+                show_custom_alert("暂未获取到该股票的最新新闻数据。", "info")
+
             tab1, tab2, tab3 = st.tabs(["🏢 Fundamentals", "📊 Technical Indicators", "📋 Raw Data"])
 
             with tab1:
@@ -274,7 +321,7 @@ if app_mode == "📊 Data Analysis":
         except Exception as e:
             show_custom_alert(f"程序运行出错: {e}", "error")
 
-elif app_mode == "🪙 Trading Syestem":
+elif app_mode == "🪙 Trading System":
     st.subheader("🪙 Trading & Quantitative Backtest")
     
     col_tinput, col_tinfo = st.columns([2, 3])
@@ -286,7 +333,7 @@ elif app_mode == "🪙 Trading Syestem":
     trade_returns = pd.Series(dtype=float)
     if resolved_trade_ticker:
         try:
-            trade_df = get_stock_data(resolved_trade_ticker, "1y") # 默认取1年数据用于计算风控指标
+            trade_df = get_stock_data(resolved_trade_ticker, "1y")
             if not trade_df.empty:
                 trade_price = float(trade_df['Close'].iloc[-1])
                 trade_returns = trade_df['Close'].pct_change().dropna()
@@ -329,10 +376,8 @@ elif app_mode == "🪙 Trading Syestem":
     total_profit = total_assets - 100000.0
     total_profit_pct = (total_profit / 100000.0) * 100
 
-    # 计算当前所查标的的风险指标 (最大回撤与夏普比率)
     max_dd, sharpe = calculate_risk_metrics(trade_returns)
 
-    # 资产与量化风控指标看板 (6列)
     mcol1, mcol2, mcol3, mcol4, mcol5, mcol6 = st.columns(6)
     mcol1.metric("账户总资产", f"${total_assets:,.2f}", f"{total_profit_pct:+.2f}%")
     mcol2.metric("可用现金", f"${st.session_state.cash:,.2f}")
@@ -400,7 +445,6 @@ elif app_mode == "🪙 Trading Syestem":
     if portfolio_details:
         st.dataframe(pd.DataFrame(portfolio_details), use_container_width=True)
         
-        # 行业分布饼图与相关性热力图
         st.markdown("---")
         st.subheader("📊 Portfolio Risk & Distribution Analysis")
         
@@ -458,7 +502,6 @@ elif app_mode == "🪙 Trading Syestem":
     else:
        show_custom_alert("📦 No current holdings. Enter a ticker above to start paper trading!", "info")
 
-    # ================= 新增功能：双均线策略回测 (Golden / Death Cross Backtest) =================
     st.markdown("---")
     st.subheader("⚡ Quantitative Strategy Backtesting (Moving Average Crossover)")
     
@@ -478,22 +521,18 @@ elif app_mode == "🪙 Trading Syestem":
             if bt_df.empty or len(bt_df) < slow_ma:
                 show_custom_alert("数据量太少，无法计算所选均线，请尝试缩短均线周期或加长回测跨度。", "warning")
             else:
-                # 计算双均线
                 bt_df['Fast_MA'] = bt_df['Close'].rolling(window=int(fast_ma)).mean()
                 bt_df['Slow_MA'] = bt_df['Close'].rolling(window=int(slow_ma)).mean()
                 
-                # 生成信号：快线上穿慢线为1（买入/持仓），下穿为0（空仓）
                 bt_df['Signal'] = 0
                 bt_df.loc[bt_df['Fast_MA'] > bt_df['Slow_MA'], 'Signal'] = 1
                 
-                # 计算策略收益与基准（买入持有）收益
                 bt_df['Market_Returns'] = bt_df['Close'].pct_change()
                 bt_df['Strategy_Returns'] = bt_df['Market_Returns'] * bt_df['Signal'].shift(1)
                 
                 bt_df['Benchmark_Cum'] = (1 + bt_df['Market_Returns'].fillna(0)).cumprod() - 1
                 bt_df['Strategy_Cum'] = (1 + bt_df['Strategy_Returns'].fillna(0)).cumprod() - 1
                 
-                # 绘制回测收益对比图
                 fig_bt = go.Figure()
                 fig_bt.add_trace(go.Scatter(x=bt_df.index, y=bt_df['Strategy_Cum'] * 100, mode='lines', name=f'双均线策略 ({fast_ma}/{slow_ma})', line=dict(color='#4CAF50')))
                 fig_bt.add_trace(go.Scatter(x=bt_df.index, y=bt_df['Benchmark_Cum'] * 100, mode='lines', name='买入并持有 (Benchmark)', line=dict(color='#a0a0a0', dash='dash')))
@@ -506,7 +545,6 @@ elif app_mode == "🪙 Trading Syestem":
                 )
                 st.plotly_chart(fig_bt, use_container_width=True)
                 
-                # 计算策略表现关键指标
                 strat_total_return = bt_df['Strategy_Cum'].iloc[-1] * 100
                 bench_total_return = bt_df['Benchmark_Cum'].iloc[-1] * 100
                 strat_mdd, strat_sharpe = calculate_risk_metrics(bt_df['Strategy_Returns'].dropna())
@@ -516,7 +554,80 @@ elif app_mode == "🪙 Trading Syestem":
                 bcol2.metric("基准总收益率", f"{bench_total_return:.2f}%")
                 bcol3.metric("策略最大回撤", f"{strat_mdd:.2f}%")
                 bcol4.metric("策略夏普比率", f"{strat_sharpe:.2f}")
-    # =========================================================================================================
+
+elif app_mode == "⚔️ AI Comparison (PK)":
+    st.subheader("⚔️ AI Stock Comparison & PK (双公司巅峰对决)")
+    
+    col_pk1, col_pk2 = st.columns(2)
+    with col_pk1:
+        query_a = st.text_input("Enter Company A:", "Apple", key="pk_comp_a")
+        resolved_a = get_ticker_from_name(query_a)
+    with col_pk2:
+        query_b = st.text_input("Enter Company B:", "Microsoft", key="pk_comp_b")
+        resolved_b = get_ticker_from_name(query_b)
+
+    if st.button("🚀 开始 AI PK 对比评测", key="btn_run_pk"):
+        if not resolved_a or not resolved_b:
+            show_custom_alert("请输入两家有效的公司名称或代码", "error")
+        else:
+            with st.spinner("正在获取双方财务数据与基本面信息并进行 AI 深度对比..."):
+                try:
+                    info_a = yf.Ticker(resolved_a).info
+                    info_b = yf.Ticker(resolved_b).info
+                    
+                    data_a = {
+                        "Ticker": resolved_a,
+                        "Name": info_a.get('shortName', resolved_a),
+                        "MarketCap": f"{info_a.get('marketCap', 0):,}" if isinstance(info_a.get('marketCap'), (int, float)) else 'N/A',
+                        "PE": f"{info_a.get('trailingPE', 'N/A'):.2f}" if isinstance(info_a.get('trailingPE'), (int, float)) else 'N/A',
+                        "PB": f"{info_a.get('priceToBook', 'N/A'):.2f}" if isinstance(info_a.get('priceToBook'), (int, float)) else 'N/A',
+                        "Margin": f"{info_a.get('profitMargins', 0) * 100:.2f}%" if isinstance(info_a.get('profitMargins'), (int, float)) else 'N/A',
+                        "Growth": f"{info_a.get('revenueGrowth', 0) * 100:.2f}%" if isinstance(info_a.get('revenueGrowth'), (int, float)) else 'N/A'
+                    }
+                    data_b = {
+                        "Ticker": resolved_b,
+                        "Name": info_b.get('shortName', resolved_b),
+                        "MarketCap": f"{info_b.get('marketCap', 0):,}" if isinstance(info_b.get('marketCap'), (int, float)) else 'N/A',
+                        "PE": f"{info_b.get('trailingPE', 'N/A'):.2f}" if isinstance(info_b.get('trailingPE'), (int, float)) else 'N/A',
+                        "PB": f"{info_b.get('priceToBook', 'N/A'):.2f}" if isinstance(info_b.get('priceToBook'), (int, float)) else 'N/A',
+                        "Margin": f"{info_b.get('profitMargins', 0) * 100:.2f}%" if isinstance(info_b.get('profitMargins'), (int, float)) else 'N/A',
+                        "Growth": f"{info_b.get('revenueGrowth', 0) * 100:.2f}%" if isinstance(info_b.get('revenueGrowth'), (int, float)) else 'N/A'
+                    }
+                    
+                    client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
+                    pk_prompt = f"""你是一位顶级华尔街基金经理与行业研究专家。请对以下两家公司进行全方位的深度 PK 对比评测：
+
+公司 A: {data_a['Name']} ({data_a['Ticker']})
+- 市值: {data_a['MarketCap']}
+- 市盈率 (PE): {data_a['PE']}
+- 市净率 (PB): {data_a['PB']}
+- 利润率: {data_a['Margin']}
+- 营收增长: {data_a['Growth']}
+
+公司 B: {data_b['Name']} ({data_b['Ticker']})
+- 市值: {data_b['MarketCap']}
+- 市盈率 (PE): {data_b['PE']}
+- 市净率 (PB): {data_b['PB']}
+- 利润率: {data_b['Margin']}
+- 营收增长: {data_b['Growth']}
+
+请从以下几个维度进行深度剖析：
+1. 【商业模式与护城河对比】：谁的护城河更深？核心壁垒是什么？
+2. 【财务健康与估值优劣】：结合 PE、PB、利润率与增长率，谁的性价比更高？
+3. 【增长潜力与未来催化剂】：谁在未来更有爆发力或更稳健？
+4. 【最终裁决 (Winner)】：明确给出更推荐哪一家，并给出核心理由。
+"""
+                    pk_response = client.chat.completions.create(
+                        model="openai/gpt-oss-120b",
+                        messages=[{"role": "user", "content": pk_prompt}]
+                    )
+                    st.markdown(f"""
+                    <div style="background-color: #1a1a1a; padding: 20px; border-radius: 10px; border: 1px solid #333333; color: #f0f0f0; font-size: 15px; line-height: 1.7;">
+                        {pk_response.choices[0].message.content.replace('\n', '<br>')}
+                    </div>
+                    """, unsafe_allow_html=True)
+                except Exception as e:
+                    show_custom_alert(f"AI PK 评测失败: {e}", "error")
 
 elif app_mode == "🏆 Top 50 Companies":
     st.subheader("🏆 Market Leaders Ranking")

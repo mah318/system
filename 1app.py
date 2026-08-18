@@ -86,7 +86,7 @@ except:
 
 # 侧边栏：独立的功能模块切换器
 st.sidebar.header("功能导航")
-app_mode = st.sidebar.radio("Select Mode", ["📊 Data Analysis", "🪙 Demo Trading Syestem"])
+app_mode = st.sidebar.radio("Select Mode", ["📊 Data Analysis", "🪙 Trading Syestem"])
 
 if app_mode == "📊 Data Analysis":
     st.sidebar.header("Report Parameters")
@@ -245,8 +245,8 @@ if app_mode == "📊 Data Analysis":
         except Exception as e:
             show_custom_alert(f"程序运行出错: {e}", "error")
 
-elif app_mode == "🪙 Demo Trading Syestem":
-    st.subheader("🪙 模拟交易与资产管理系统")
+elif app_mode == "🪙 Trading Syestem":
+    st.subheader("🪙 Trading")
     
     col_tinput, col_tinfo = st.columns([2, 3])
     with col_tinput:

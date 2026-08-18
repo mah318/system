@@ -262,7 +262,7 @@ elif app_mode == "🪙 Trading Syestem":
                 with col_tinfo:
                     st.markdown(f"""
                     <div style="background-color: #1a1a1a; padding: 10px 15px; border-radius: 6px; border: 1px solid #333333; color: #f0f0f0; margin-top: 24px;">
-                        🎯 目标标的: <b>{resolved_trade_ticker}</b> | 最新价格: <b style="color: #4CAF50;">${trade_price:.2f}</b>
+                        <b>{resolved_trade_ticker}</b> | Latest Prices: <b style="color: #4CAF50;">${trade_price:.2f}</b>
                     </div>
                     """, unsafe_allow_html=True)
             else:

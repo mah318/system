@@ -86,10 +86,10 @@ except:
 
 # 侧边栏：独立的功能模块切换器
 st.sidebar.header("功能导航")
-app_mode = st.sidebar.radio("选择操作模式", ["📊 机构研报与数据分析", "🪙 模拟交易系统"])
+app_mode = st.sidebar.radio("Select Mode", ["📊 Data Analysis", "🪙 Demo Trading Syestem"])
 
-if app_mode == "📊 机构研报与数据分析":
-    st.sidebar.header("研报参数配置")
+if app_mode == "📊 Data Analysis":
+    st.sidebar.header("Report Parameters")
     tickers_raw = st.sidebar.text_input("Enter Company Name:", "Apple")
     period = st.sidebar.selectbox("Time:", ["1D", "10D", "1mo", "3mo", "6mo", "1y", "10y", "20y"], index=2)
     normalize = st.sidebar.checkbox("Normalize Comparison (Start from 0%)", value=True)
@@ -97,7 +97,7 @@ if app_mode == "📊 机构研报与数据分析":
     raw_inputs = [t.strip() for t in tickers_raw.split(',') if t.strip()]
     
     if not raw_inputs:
-        show_custom_alert("请输入公司名称或股票代码", "error")
+        show_custom_alert("Please enter a company name or ticker", "error")
     else:
         tickers_input = []
         mapping_info = []
@@ -205,10 +205,10 @@ if app_mode == "📊 机构研报与数据分析":
                 except Exception as ai_err:
                     show_custom_alert(f"AI 智能决策请求失败: {ai_err}", "error")
 
-            tab1, tab2, tab3 = st.tabs(["🏢 基本面分析", "📊 技术指标", "📋 数据预览"])
+            tab1, tab2, tab3 = st.tabs(["🏢 Fundamentals", "📊 Technical Indicators", "📋 Raw Data"])
 
             with tab1:
-                st.subheader(f"基本盘分析: {primary_ticker}")
+                st.subheader(f"Fundamentals Analysis: {primary_ticker}")
                 col1, col2, col3 = st.columns(3)
                 col1.metric("市值 (Market Cap)", market_cap_str)
                 col2.metric("市盈率 (P/E)", pe_str)
@@ -219,7 +219,7 @@ if app_mode == "📊 机构研报与数据分析":
                 col5.metric("营收增长率 (Revenue Growth)", growth_str)
                 
                 st.markdown("---")
-                st.write("**🤖 AI 基本盘深度评估:**")
+                st.write("**🤖 AI Fundamental Evaluation:**")
                 if api_key and api_key != "你的API_KEY填在这里":
                     try:
                         fund_prompt = f"基于 {primary_ticker} 的硬性数据（PE: {pe_str}, PB: {pb_str}, 利润率: {margin_str}, 营收增长: {growth_str}），请用数据推导列出5项核心基本面评价。"
@@ -247,11 +247,10 @@ if app_mode == "📊 机构研报与数据分析":
 
 elif app_mode == "🪙 模拟交易系统":
     st.subheader("🪙 模拟交易与资产管理系统")
-    st.write("此模块支持数据持久化存储。买入或卖出后会自动保存到本地文件，刷新页面数据也不会丢失。")
     
     col_tinput, col_tinfo = st.columns([2, 3])
     with col_tinput:
-        trade_query = st.text_input("输入要交易的股票代码/名称:", "AAPL", key="independent_trade_ticker")
+        trade_query = st.text_input("Enter the stock code/name:", "AAPL", key="independent_trade_ticker")
         resolved_trade_ticker = get_ticker_from_name(trade_query)
     
     trade_price = 0.0

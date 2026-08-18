@@ -354,11 +354,11 @@ elif app_mode == "🪙 Trading Syestem":
                 
                 save_data() # 保存到本地文件
                 show_custom_alert(f"成功卖出 {sell_shares} 股 {resolved_trade_ticker}，获得现金 ${earned_cash:,.2f}！", "success")
-                st.rerun()
+                st.rerun() 
             else:
                 show_custom_alert("Insufficient holdings or no position to sell!", "error")
     st.markdown("---")
-    st.subheader("📦 当前所有持仓明细")
+    st.subheader("📦 Current Holding Detials")
     if portfolio_details:
         st.dataframe(pd.DataFrame(portfolio_details), use_container_width=True)
     else:

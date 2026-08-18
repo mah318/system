@@ -90,7 +90,7 @@ except:
 
 # 侧边栏：独立的功能模块切换器
 st.sidebar.header("Function")
-app_mode = st.sidebar.radio("Select Mode", ["📊 Data Analysis", "🪙 Trading System", "🏆 Top 50 Companies"])
+app_mode = st.sidebar.radio("Select Mode", ["📊 Data Analysis", "🪙 Trading Syestem", "🏆 Top 50 Companies"])
 
 if app_mode == "📊 Data Analysis":
     st.sidebar.header("Report Parameters")
@@ -361,10 +361,71 @@ elif app_mode == "🪙 Trading Syestem":
                 st.rerun()
             else:
                 show_custom_alert("Insufficient holdings or no position to sell!", "error")
+                
     st.markdown("---")
     st.subheader("📦 Current Holdings Details")
     if portfolio_details:
         st.dataframe(pd.DataFrame(portfolio_details), use_container_width=True)
+        
+        # ================= 新增功能：行业分布饼图与相关性热力图 =================
+        st.markdown("---")
+        st.subheader("📊 Portfolio Risk & Distribution Analysis")
+        
+        col_pie, col_heat = st.columns(2)
+        
+        # 1. 行业/板块分布饼图
+        with col_pie:
+            st.markdown("#### 行业板块分布 (Sector Allocation)")
+            sector_allocation = {}
+            for t, data in st.session_state.portfolio.items():
+                shares = data["shares"]
+                latest_df = get_stock_data(t, "1D")
+                cur_p = float(latest_df['Close'].iloc[-1]) if not latest_df.empty else data["avg_price"]
+                market_val = shares * cur_p
+                try:
+                    sector = yf.Ticker(t).info.get('sector', 'Others')
+                except:
+                    sector = 'Others'
+                sector_allocation[sector] = sector_allocation.get(sector, 0.0) + market_val
+            
+            if sector_allocation:
+                sec_df = pd.DataFrame(list(sector_allocation.items()), columns=["Sector", "Value"])
+                fig_pie = go.Figure(data=[go.Pie(labels=sec_df["Sector"], values=sec_df["Value"], hole=.3)])
+                fig_pie.update_layout(template="plotly_dark", margin=dict(t=20, b=20, l=20, r=20))
+                st.plotly_chart(fig_pie, use_container_width=True)
+            else:
+                show_custom_alert("暂无行业数据", "info")
+
+        # 2. 组合资产相关性热力图
+        with col_heat:
+            st.markdown("#### 资产相关性热力图 (Correlation Heatmap)")
+            portfolio_tickers = list(st.session_state.portfolio.keys())
+            if len(portfolio_tickers) >= 2:
+                hist_data = {}
+                for t in portfolio_tickers:
+                    df_hist = get_stock_data(t, "3mo")
+                    if not df_hist.empty:
+                        hist_data[t] = df_hist['Close']
+                
+                if len(hist_data) >= 2:
+                    price_df = pd.DataFrame(hist_data).dropna()
+                    corr_matrix = price_df.corr()
+                    
+                    fig_heat = go.Figure(data=go.Heatmap(
+                        z=corr_matrix.values,
+                        x=corr_matrix.columns,
+                        y=corr_matrix.index,
+                        colorscale='Viridis',
+                        zmin=-1, zmax=1
+                    ))
+                    fig_heat.update_layout(template="plotly_dark", margin=dict(t=20, b=20, l=20, r=20))
+                    st.plotly_chart(fig_heat, use_container_width=True)
+                else:
+                    show_custom_alert("历史数据不足，无法生成相关性热力图", "info")
+            else:
+                show_custom_alert("至少需要持有 2 只不同的股票才能生成相关性热力图", "info")
+        # =======================================================================
+        
     else:
        show_custom_alert("📦 No current holdings. Enter a ticker above to start paper trading!", "info")
 

@@ -6,6 +6,7 @@ import pandas as pd
 import requests
 import json
 import os
+import concurrent.futures
 
 # ==================== 在这里直接内置你的 API Key ====================
 BUILTIN_API_KEY = "你的API_KEY填在这里" 
@@ -309,11 +310,11 @@ elif app_mode == "🪙 Trading Syestem":
     col_buy, col_sell = st.columns(2)
     
     with col_buy:
-        st.markdown(f"#### 🟢 Sell: `{resolved_trade_ticker}`")
+        st.markdown(f"#### 🟢 Buy: `{resolved_trade_ticker}`")
         buy_shares = st.number_input("买入股数", min_value=1, value=10, step=1, key="ind_buy_shares")
         total_cost = buy_shares * trade_price if trade_price > 0 else 0
         st.write(f"预计总花费: **${total_cost:,.2f}**")
-        if st.button("Conform Buy", key="btn_ind_buy"):
+        if st.button("Confirm Buy", key="btn_ind_buy"):
             if trade_price <= 0:
                 show_custom_alert("无效的股票价格！", "error")
             elif st.session_state.cash >= total_cost:
@@ -343,7 +344,7 @@ elif app_mode == "🪙 Trading Syestem":
         else:
             sell_shares = st.number_input("卖出股数", min_value=0, max_value=0, value=0, step=1, disabled=True, key="ind_sell_shares_disabled")
         
-        if st.button("Conform Sell", key="btn_ind_sell"):
+        if st.button("Confirm Sell", key="btn_ind_sell"):
             if owned_shares >= sell_shares > 0 and trade_price > 0:
                 earned_cash = sell_shares * trade_price
                 st.session_state.cash += earned_cash
@@ -415,31 +416,34 @@ elif app_mode == "🏆 Top 50 Companies":
     currency_symbol = "$" if "Global" in market_option else "RM"
 
     @st.cache_data(ttl=600)
-    def fetch_market_data(companies_list):
-        data_rows = []
-        for ticker, name in companies_list:
+    def fetch_market_data(companies_list, currency_sym):
+        def get_single_stock_info(item):
+            ticker, name = item
             try:
                 stock = yf.Ticker(ticker)
                 inf = stock.info
-                # 兼容不同市场的价格获取方式
                 price = inf.get('currentPrice') or inf.get('regularMarketPrice') or 0
                 mcap = inf.get('marketCap') or 0
-                data_rows.append({
+                return {
                     "Ticker": ticker,
                     "Company": name,
-                    "Price_Display": f"{currency_symbol}{price:,.2f}" if price else "N/A",
+                    "Price_Display": f"{currency_sym}{price:,.2f}" if price else "N/A",
                     "Market Cap": f"{mcap:,.0f}" if mcap else "N/A",
                     "MarketCap_Raw": mcap
-                })
+                }
             except:
-                data_rows.append({
+                return {
                     "Ticker": ticker, "Company": name, 
                     "Price_Display": "N/A", "Market Cap": "N/A", "MarketCap_Raw": 0
-                })
+                }
+
+        # 使用线程池并发抓取，max_workers=10 兼顾速度与稳定性
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            data_rows = list(executor.map(get_single_stock_info, companies_list))
         return pd.DataFrame(data_rows)
 
     with st.spinner(f"Fetching {market_option} data..."):
-        df_top = fetch_market_data(target_list)
+        df_top = fetch_market_data(target_list, currency_symbol)
     
     if not df_top.empty and "MarketCap_Raw" in df_top.columns:
         df_top = df_top.sort_values(by="MarketCap_Raw", ascending=False).reset_index(drop=True)

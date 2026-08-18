@@ -85,7 +85,7 @@ except:
     api_key = BUILTIN_API_KEY
 
 # 侧边栏：独立的功能模块切换器
-st.sidebar.header("功能导航")
+st.sidebar.header("Function")
 app_mode = st.sidebar.radio("Select Mode", ["📊 Data Analysis", "🪙 Trading Syestem"])
 
 if app_mode == "📊 Data Analysis":

@@ -9,7 +9,7 @@ import os
 import concurrent.futures
 
 # ==================== 在这里直接内置你的 API Key ====================
-BUILTIN_API_KEY = "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" 
+BUILTIN_API_KEY = "你的API_KEY填在这里" 
 # ==================================================================
 
 # 数据持久化文件路径
@@ -72,9 +72,12 @@ def get_ticker_from_name(query):
 
 @st.cache_data
 def get_stock_data(ticker, period):
-    stock = yf.Ticker(ticker)
-    df = stock.history(period=period)
-    return df
+    try:
+        stock = yf.Ticker(ticker)
+        df = stock.history(period=period)
+        return df
+    except Exception:
+        return pd.DataFrame()
 
 st.set_page_config(page_title="Financial Terminal", layout="wide")
 st.title("📈 AI Financial Terminal ")
@@ -87,7 +90,7 @@ except:
 
 # 侧边栏：独立的功能模块切换器
 st.sidebar.header("Function")
-app_mode = st.sidebar.radio("Select Mode", ["📊 Data Analysis", "🪙 Trading System", "🏆 Top 50 Companies"])
+app_mode = st.sidebar.radio("Select Mode", ["📊 Data Analysis", "🪙 Trading Syestem", "🏆 Top 50 Companies"])
 
 if app_mode == "📊 Data Analysis":
     st.sidebar.header("Report Parameters")
@@ -328,7 +331,7 @@ elif app_mode == "🪙 Trading Syestem":
                 else:
                     st.session_state.portfolio[resolved_trade_ticker] = {"shares": buy_shares, "avg_price": trade_price}
                 
-                save_data() # 保存到本地文件
+                save_data()
                 show_custom_alert(f"成功买入 {buy_shares} 股 {resolved_trade_ticker}！", "success")
                 st.rerun()
             else:
@@ -353,7 +356,7 @@ elif app_mode == "🪙 Trading Syestem":
                 else:
                     st.session_state.portfolio[resolved_trade_ticker]["shares"] -= sell_shares
                 
-                save_data() # 保存到本地文件
+                save_data()
                 show_custom_alert(f"成功卖出 {sell_shares} 股 {resolved_trade_ticker}，获得现金 ${earned_cash:,.2f}！", "success")
                 st.rerun()
             else:
@@ -368,10 +371,8 @@ elif app_mode == "🪙 Trading Syestem":
 elif app_mode == "🏆 Top 50 Companies":
     st.subheader("🏆 Market Leaders Ranking")
     
-    # 新增：市场选择器
     market_option = st.radio("Select Market:", ["Global (USA)", "Malaysia (Bursa)"], horizontal=True)
     
-    # 全球 Top 50 列表
     global_companies = [
         ("AAPL", "Apple Inc."), ("MSFT", "Microsoft Corporation"), ("NVDA", "NVIDIA Corporation"),
         ("GOOGL", "Alphabet Inc."), ("AMZN", "Amazon.com, Inc."), ("META", "Meta Platforms, Inc."),
@@ -392,9 +393,8 @@ elif app_mode == "🏆 Top 50 Companies":
         ("UBER", "Uber Technologies"), ("NKE", "NIKE, Inc."), ("PYPL", "PayPal Holdings")
     ]
 
-    # 马来西亚 Top 50 列表 (使用 .KL 后缀)
     malaysia_companies = [
-        ("1155.KL", "Malayan Banking Bhd (Maybank)"), ("1295.KL", "Public Bank Bhd"),
+        ("1155.KL", "MalayanBanking Bhd (Maybank)"), ("1295.KL", "Public Bank Bhd"),
         ("1023.KL", "CIMB Group Holdings"), ("5347.KL", "Tenaga Nasional Bhd"),
         ("5183.KL", "Petronas Chemicals"), ("5225.KL", "IHH Healthcare"),
         ("5819.KL", "Hong Leong Bank"), ("8869.KL", "Press Metal Aluminium"),
@@ -411,7 +411,6 @@ elif app_mode == "🏆 Top 50 Companies":
         ("5657.KL", "Petronas Dagangan"), ("1083.KL", "Hong Leong Financial")
     ]
 
-    # 根据选择确定列表
     target_list = global_companies if "Global" in market_option else malaysia_companies
     currency_symbol = "$" if "Global" in market_option else "RM"
 
@@ -437,7 +436,6 @@ elif app_mode == "🏆 Top 50 Companies":
                     "Price_Display": "N/A", "Market Cap": "N/A", "MarketCap_Raw": 0
                 }
 
-        # 使用线程池并发抓取，max_workers=10 兼顾速度与稳定性
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
             data_rows = list(executor.map(get_single_stock_info, companies_list))
         return pd.DataFrame(data_rows)

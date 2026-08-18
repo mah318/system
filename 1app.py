@@ -365,10 +365,13 @@ elif app_mode == "🪙 Trading Syestem":
        show_custom_alert("📦 No current holdings. Enter a ticker above to start paper trading!", "info")
 
 elif app_mode == "🏆 Top 50 Companies":
-    st.subheader("🏆 Global Top 50 Core Companies Market")
-    st.write("Here is the real-time market data, market cap, and latest prices of selected top global listed companies.")
-
-    top_companies = [
+    st.subheader("🏆 Market Leaders Ranking")
+    
+    # 新增：市场选择器
+    market_option = st.radio("Select Market:", ["Global (USA)", "Malaysia (Bursa)"], horizontal=True)
+    
+    # 全球 Top 50 列表
+    global_companies = [
         ("AAPL", "Apple Inc."), ("MSFT", "Microsoft Corporation"), ("NVDA", "NVIDIA Corporation"),
         ("GOOGL", "Alphabet Inc."), ("AMZN", "Amazon.com, Inc."), ("META", "Meta Platforms, Inc."),
         ("BRK-B", "Berkshire Hathaway"), ("TSLA", "Tesla, Inc."), ("LLY", "Eli Lilly and Company"),
@@ -388,39 +391,61 @@ elif app_mode == "🏆 Top 50 Companies":
         ("UBER", "Uber Technologies"), ("NKE", "NIKE, Inc."), ("PYPL", "PayPal Holdings")
     ]
 
+    # 马来西亚 Top 50 列表 (使用 .KL 后缀)
+    malaysia_companies = [
+        ("1155.KL", "Malayan Banking Bhd (Maybank)"), ("1295.KL", "Public Bank Bhd"),
+        ("1023.KL", "CIMB Group Holdings"), ("5347.KL", "Tenaga Nasional Bhd"),
+        ("5183.KL", "Petronas Chemicals"), ("5225.KL", "IHH Healthcare"),
+        ("5819.KL", "Hong Leong Bank"), ("8869.KL", "Press Metal Aluminium"),
+        ("6012.KL", "Maxis Bhd"), ("6947.KL", "CelcomDigi Bhd"),
+        ("1961.KL", "IOI Corporation"), ("6742.KL", "YTL Power International"),
+        ("4863.KL", "Telekom Malaysia"), ("2445.KL", "Kuala Lumpur Kepong (KLK)"),
+        ("5326.KL", "99 Speed Mart"), ("4456.KL", "Gamuda Bhd"),
+        ("6718.KL", "YTL Corporation"), ("5285.KL", "SD Guthrie (Sime Darby Plant.)"),
+        ("1066.KL", "RHB Bank"), ("6033.KL", "Petronas Gas"),
+        ("3816.KL", "MISC Bhd"), ("5211.KL", "Sunway Bhd"),
+        ("5246.KL", "Westports Holdings"), ("4707.KL", "Nestle (Malaysia)"),
+        ("1015.KL", "AMMB Holdings"), ("5878.KL", "Dialog Group"),
+        ("4197.KL", "Sime Darby Bhd"), ("6888.KL", "Axiata Group"),
+        ("5657.KL", "Petronas Dagangan"), ("1083.KL", "Hong Leong Financial")
+    ]
+
+    # 根据选择确定列表
+    target_list = global_companies if "Global" in market_option else malaysia_companies
+    currency_symbol = "$" if "Global" in market_option else "RM"
+
     @st.cache_data(ttl=600)
-    def fetch_top_companies_data(companies_list):
+    def fetch_market_data(companies_list):
         data_rows = []
         for ticker, name in companies_list:
             try:
                 stock = yf.Ticker(ticker)
                 inf = stock.info
-                price = inf.get('currentPrice', inf.get('regularMarketPrice', 0))
-                mcap = inf.get('marketCap', 0)
+                # 兼容不同市场的价格获取方式
+                price = inf.get('currentPrice') or inf.get('regularMarketPrice') or 0
+                mcap = inf.get('marketCap') or 0
                 data_rows.append({
                     "Ticker": ticker,
                     "Company": name,
-                    "Latest Price ($)": f"${price:,.2f}" if price else "N/A",
-                    "Market Cap": f"${mcap:,.0f}" if mcap else "N/A",
-                    "MarketCap_Raw": mcap if mcap else 0
+                    "Price_Display": f"{currency_symbol}{price:,.2f}" if price else "N/A",
+                    "Market Cap": f"{mcap:,.0f}" if mcap else "N/A",
+                    "MarketCap_Raw": mcap
                 })
             except:
                 data_rows.append({
-                    "Ticker": ticker,
-                    "Company": name,
-                    "Latest Price ($)": "N/A",
-                    "Market Cap": "N/A",
-                    "MarketCap_Raw": 0
+                    "Ticker": ticker, "Company": name, 
+                    "Price_Display": "N/A", "Market Cap": "N/A", "MarketCap_Raw": 0
                 })
         return pd.DataFrame(data_rows)
 
-    with st.spinner("Fetching real-time market data for top global companies, please wait..."):
-        df_top = fetch_top_companies_data(top_companies)
+    with st.spinner(f"Fetching {market_option} data..."):
+        df_top = fetch_market_data(target_list)
     
     if not df_top.empty and "MarketCap_Raw" in df_top.columns:
         df_top = df_top.sort_values(by="MarketCap_Raw", ascending=False).reset_index(drop=True)
         df_top.index = df_top.index + 1
         df_display = df_top.drop(columns=["MarketCap_Raw"])
+        df_display.columns = ["Ticker", "Company", "Latest Price", "Market Cap"]
         st.dataframe(df_display, use_container_width=True)
     else:
-        show_custom_alert("Failed to load company list, please check your network connection.", "error")
+        show_custom_alert("Failed to load data, please check your internet connection.", "error")

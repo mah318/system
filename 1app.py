@@ -86,7 +86,7 @@ except:
 
 # 侧边栏：独立的功能模块切换器
 st.sidebar.header("Function")
-app_mode = st.sidebar.radio("Select Mode", ["📊 Data Analysis", "🪙 Trading Syestem"])
+app_mode = st.sidebar.radio("Select Mode", ["📊 Data Analysis", "🪙 Trading Syestem", "🏆 Top 50 Companies"])
 
 if app_mode == "📊 Data Analysis":
     st.sidebar.header("Report Parameters")
@@ -363,3 +363,64 @@ elif app_mode == "🪙 Trading Syestem":
         st.dataframe(pd.DataFrame(portfolio_details), use_container_width=True)
     else:
        show_custom_alert("📦 No current holdings. Enter a ticker above to start paper trading!", "info")
+
+elif app_mode == "🏆 Top 50 Companies":
+    st.subheader("🏆 Global Top 50 Core Companies Market")
+    st.write("Here is the real-time market data, market cap, and latest prices of selected top global listed companies.")
+
+    top_companies = [
+        ("AAPL", "Apple Inc."), ("MSFT", "Microsoft Corporation"), ("NVDA", "NVIDIA Corporation"),
+        ("GOOGL", "Alphabet Inc."), ("AMZN", "Amazon.com, Inc."), ("META", "Meta Platforms, Inc."),
+        ("BRK-B", "Berkshire Hathaway"), ("TSLA", "Tesla, Inc."), ("LLY", "Eli Lilly and Company"),
+        ("AVGO", "Broadcom Inc."), ("JPM", "JPMorgan Chase & Co."), ("WMT", "Walmart Inc."),
+        ("V", "Visa Inc."), ("XOM", "Exxon Mobil Corporation"), ("MA", "Mastercard Incorporated"),
+        ("UNH", "UnitedHealth Group"), ("COST", "Costco Wholesale"), ("JNJ", "Johnson & Johnson"),
+        ("HD", "The Home Depot"), ("PG", "Procter & Gamble"), ("NFLX", "Netflix, Inc."),
+        ("ABBV", "AbbVie Inc."), ("BAC", "Bank of America"), ("CRM", "Salesforce, Inc."),
+        ("AMD", "Advanced Micro Devices"), ("ADBE", "Adobe Inc."), ("CVX", "Chevron Corporation"),
+        ("WFC", "Wells Fargo & Company"), ("MRK", "Merck & Co., Inc."), ("TMO", "Thermo Fisher Scientific"),
+        ("LIN", "Linde plc"), ("ABT", "Abbott Laboratories"), ("DIS", "The Walt Disney Company"),
+        ("PM", "Philip Morris International"), ("IBM", "International Business Machines"),
+        ("QCOM", "QUALCOMM Incorporated"), ("GE", "General Electric Company"), ("CAT", "Caterpillar Inc."),
+        ("AMAT", "Applied Materials"), ("INTU", "Intuit Inc."), ("BKNG", "Booking Holdings Inc."),
+        ("NOW", "ServiceNow, Inc."), ("ISRG", "Intuitive Surgical"), ("SPGI", "S&P Global Inc."),
+        ("VZ", "Verizon Communications"), ("T", "AT&T Inc."), ("PFE", "Pfizer Inc."),
+        ("UBER", "Uber Technologies"), ("NKE", "NIKE, Inc."), ("PYPL", "PayPal Holdings")
+    ]
+
+    @st.cache_data(ttl=600)
+    def fetch_top_companies_data(companies_list):
+        data_rows = []
+        for ticker, name in companies_list:
+            try:
+                stock = yf.Ticker(ticker)
+                inf = stock.info
+                price = inf.get('currentPrice', inf.get('regularMarketPrice', 0))
+                mcap = inf.get('marketCap', 0)
+                data_rows.append({
+                    "Ticker": ticker,
+                    "Company": name,
+                    "Latest Price ($)": f"${price:,.2f}" if price else "N/A",
+                    "Market Cap": f"${mcap:,.0f}" if mcap else "N/A",
+                    "MarketCap_Raw": mcap if mcap else 0
+                })
+            except:
+                data_rows.append({
+                    "Ticker": ticker,
+                    "Company": name,
+                    "Latest Price ($)": "N/A",
+                    "Market Cap": "N/A",
+                    "MarketCap_Raw": 0
+                })
+        return pd.DataFrame(data_rows)
+
+    with st.spinner("Fetching real-time market data for top global companies, please wait..."):
+        df_top = fetch_top_companies_data(top_companies)
+    
+    if not df_top.empty and "MarketCap_Raw" in df_top.columns:
+        df_top = df_top.sort_values(by="MarketCap_Raw", ascending=False).reset_index(drop=True)
+        df_top.index = df_top.index + 1
+        df_display = df_top.drop(columns=["MarketCap_Raw"])
+        st.dataframe(df_display, use_container_width=True)
+    else:
+        show_custom_alert("Failed to load company list, please check your network connection.", "error")

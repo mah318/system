@@ -299,23 +299,22 @@ if app_mode == "📊 Data Analysis":
                 col4, col5 = st.columns(2)
                 col4.metric("利润率 (Profit Margin)", margin_str)
                 col5.metric("营收增长率 (Revenue Growth)", growth_str)
-
-            st.markdown("---")
-                st.subheader("🤖 AI Basic Fundamentals Analysis")
-                if api_key:
-                    try:
-                        client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
-                        fundamental_prompt = f"""请作为资深分析师，对 {primary_ticker} 的以下基本面数据进行专业研报点评：
-                        市盈率(PE): {pe_str}, 市净率(PB): {pb_str}, 利润率: {margin_str}, 营收增长: {growth_str}。
-                        请评价其估值是否合理，并简要概括财务健康状况。"""
-                        response = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": fundamental_prompt}])
-                        st.markdown(f"<div style='background:#1a1a1a; padding:15px; border-radius:8px;'>{response.choices[0].message.content}</div>", unsafe_allow_html=True)
-                    except Exception as e:
-                        st.error(f"AI Analysis error: {e}")
-                else:
-                    st.warning("API Key not configured.")
                 
-
+                st.markdown("---")
+                st.write("**🤖 AI Fundamental Evaluation:**")
+                if api_key and api_key != "你的API_KEY填在这里":
+                    try:
+                        fund_prompt = f"基于 {primary_ticker} 的硬性数据（PE: {pe_str}, PB: {pb_str}, 利润率: {margin_str}, 营收增长: {growth_str}），请用数据推导列出5项核心基本面评价。"
+                        fund_response = client.chat.completions.create(
+                            model=auto_model,
+                            messages=[{"role": "user", "content": fund_prompt}]
+                        )
+                        st.write(fund_response.choices[0].message.content)
+                    except:
+                        show_custom_alert("基本面 AI 评估加载失败。", "error")
+                else:
+                    show_custom_alert("请先配置 API Key 以查看 AI 评估。", "warning")
+                    
             with tab2:
                 st.subheader(f"技术指标 : {primary_ticker}")
                 st.line_chart(df_primary[['RSI']])

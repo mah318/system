@@ -9,11 +9,32 @@ import requests
 BUILTIN_API_KEY = "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" 
 # ==================================================================
 
-# 初始化模拟炒股账户资产 (Session State)
+# 数据持久化文件路径
+DATA_FILE = "portfolio_data.json"
+
+def load_data():
+    if os.path.exists(DATA_FILE):
+        try:
+            with open(DATA_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            pass
+    return {"cash": 100000.0, "portfolio": {}}
+
+def save_data():
+    data = {
+        "cash": st.session_state.cash,
+        "portfolio": st.session_state.portfolio
+    }
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+
+# 初始化模拟炒股账户资产 (从本地文件加载)
+saved_data = load_data()
 if 'cash' not in st.session_state:
-    st.session_state.cash = 100000.0  # 初始虚拟资金 10万美元
+    st.session_state.cash = saved_data.get("cash", 100000.0)
 if 'portfolio' not in st.session_state:
-    st.session_state.portfolio = {}  # 格式: {ticker: {"shares": 数量, "avg_price": 均价}}
+    st.session_state.portfolio = saved_data.get("portfolio", {})
 
 # 统一的暗黑主题提示框函数
 def show_custom_alert(text, alert_type="info"):
@@ -224,7 +245,7 @@ if app_mode == "📊 机构研报与数据分析":
 
 elif app_mode == "🪙 模拟交易系统":
     st.subheader("🪙 模拟交易与资产管理系统")
-    st.write("此模块与左侧研报数据**完全独立**。你可以随时输入任意股票代码进行虚拟买入和卖出，随时追踪资产盈亏。")
+    st.write("此模块支持数据持久化存储。买入或卖出后会自动保存到本地文件，刷新页面数据也不会丢失。")
     
     col_tinput, col_tinfo = st.columns([2, 3])
     with col_tinput:
@@ -304,6 +325,8 @@ elif app_mode == "🪙 模拟交易系统":
                     st.session_state.portfolio[resolved_trade_ticker] = {"shares": new_shares, "avg_price": new_avg}
                 else:
                     st.session_state.portfolio[resolved_trade_ticker] = {"shares": buy_shares, "avg_price": trade_price}
+                
+                save_data() # 保存到本地文件
                 show_custom_alert(f"成功买入 {buy_shares} 股 {resolved_trade_ticker}！", "success")
                 st.rerun()
             else:
@@ -327,6 +350,8 @@ elif app_mode == "🪙 模拟交易系统":
                     del st.session_state.portfolio[resolved_trade_ticker]
                 else:
                     st.session_state.portfolio[resolved_trade_ticker]["shares"] -= sell_shares
+                
+                save_data() # 保存到本地文件
                 show_custom_alert(f"成功卖出 {sell_shares} 股 {resolved_trade_ticker}，获得现金 ${earned_cash:,.2f}！", "success")
                 st.rerun()
             else:
@@ -337,4 +362,3 @@ elif app_mode == "🪙 模拟交易系统":
         st.dataframe(pd.DataFrame(portfolio_details), use_container_width=True)
     else:
        show_custom_alert("📦 No current holdings. Enter a ticker above to start paper trading!", "info")
-  

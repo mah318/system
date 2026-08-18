@@ -13,6 +13,21 @@ import concurrent.futures
 BUILTIN_API_KEY = "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"
 # ==================================================================
 
+import streamlit as st
+import yfinance as yf
+import plotly.graph_objects as go
+from openai import OpenAI
+import pandas as pd
+import numpy as np
+import requests
+import json
+import os
+import concurrent.futures
+
+# ==================== 在这里直接内置你的 API Key ====================
+BUILTIN_API_KEY = "你的API_KEY填在这里" 
+# ==================================================================
+
 # 数据持久化文件路径
 DATA_FILE = "portfolio_data.json"
 
@@ -95,6 +110,28 @@ def get_stock_news(ticker):
     except:
         return []
 
+# 计算最大回撤与夏普比率辅助函数
+def calculate_risk_metrics(returns_series):
+    if returns_series.empty or len(returns_series) < 2:
+        return 0.0, 0.0
+    
+    cum_returns = (1 + returns_series).cumprod()
+    peak = cum_returns.cummax()
+    drawdown = (cum_returns - peak) / peak
+    max_drawdown = float(drawdown.min()) * 100
+    
+    mean_daily_return = returns_series.mean()
+    std_daily_return = returns_series.std()
+    
+    if std_daily_return == 0 or np.isnan(std_daily_return):
+        sharpe_ratio = 0.0
+    else:
+        sharpe_ratio = float((mean_daily_return / std_daily_return) * np.sqrt(252))
+        
+    return max_drawdown, sharpe_ratio
+
+st.set_page_config(page_title="Financial Terminal", layout="wide")
+st.title("📈 AI Financial Terminal ")
 
 # 优先从 secrets 读取，若无则使用上方定义的 BUILTIN_API_KEY
 try:
@@ -104,7 +141,7 @@ except:
 
 # 侧边栏：独立的功能模块切换器
 st.sidebar.header("Function")
-app_mode = st.sidebar.radio("Select Mode", ["📊 Data Analysis", "🪙 Trading System", "⚔️ Companies Comparison", "🏆 Top 50 Companies"])
+app_mode = st.sidebar.radio("Select Mode", ["📊 Data Analysis", "🪙 Trading System", "⚔️ AI Comparison (PK)", "🏆 Top 50 Companies"])
 
 if app_mode == "📊 Data Analysis":
     st.sidebar.header("Report Parameters")
@@ -439,11 +476,92 @@ elif app_mode == "🪙 Trading System":
                 st.plotly_chart(fig_pie, use_container_width=True)
             else:
                 show_custom_alert("暂无行业数据", "info")
+
+        with col_heat:
+            st.markdown("#### 资产相关性热力图 (Correlation Heatmap)")
+            portfolio_tickers = list(st.session_state.portfolio.keys())
+            if len(portfolio_tickers) >= 2:
+                hist_data = {}
+                for t in portfolio_tickers:
+                    df_hist = get_stock_data(t, "3mo")
+                    if not df_hist.empty:
+                        hist_data[t] = df_hist['Close']
+                
+                if len(hist_data) >= 2:
+                    price_df = pd.DataFrame(hist_data).dropna()
+                    corr_matrix = price_df.corr()
+                    
+                    fig_heat = go.Figure(data=go.Heatmap(
+                        z=corr_matrix.values,
+                        x=corr_matrix.columns,
+                        y=corr_matrix.index,
+                        colorscale='Viridis',
+                        zmin=-1, zmax=1
+                    ))
+                    fig_heat.update_layout(template="plotly_dark", margin=dict(t=20, b=20, l=20, r=20))
+                    st.plotly_chart(fig_heat, use_container_width=True)
+                else:
+                    show_custom_alert("历史数据不足，无法生成相关性热力图", "info")
+            else:
+                show_custom_alert("至少需要持有 2 只不同的股票才能生成相关性热力图", "info")
     else:
        show_custom_alert("📦 No current holdings. Enter a ticker above to start paper trading!", "info")
 
-elif app_mode == "⚔️ Companies Comparison":
-    st.subheader("⚔️ Companies Stock Comparison ")
+    st.markdown("---")
+    st.subheader("⚡ Quantitative Strategy Backtesting (Moving Average Crossover)")
+    
+    col_bt1, col_bt2, col_bt3 = st.columns(3)
+    with col_bt1:
+        fast_ma = st.number_input("短期均线周期 (Fast MA)", min_value=5, max_value=50, value=20, step=1)
+    with col_bt2:
+        slow_ma = st.number_input("长期均线周期 (Slow MA)", min_value=20, max_value=200, value=50, step=1)
+    with col_bt3:
+        backtest_period = st.selectbox("回测历史跨度", ["6mo", "1y", "2y", "5y"], index=1)
+
+    if st.button("🚀 运行金叉/死叉策略回测", key="btn_run_backtest"):
+        if not resolved_trade_ticker:
+            show_custom_alert("请先输入有效的股票代码", "error")
+        else:
+            bt_df = get_stock_data(resolved_trade_ticker, backtest_period)
+            if bt_df.empty or len(bt_df) < slow_ma:
+                show_custom_alert("数据量太少，无法计算所选均线，请尝试缩短均线周期或加长回测跨度。", "warning")
+            else:
+                bt_df['Fast_MA'] = bt_df['Close'].rolling(window=int(fast_ma)).mean()
+                bt_df['Slow_MA'] = bt_df['Close'].rolling(window=int(slow_ma)).mean()
+                
+                bt_df['Signal'] = 0
+                bt_df.loc[bt_df['Fast_MA'] > bt_df['Slow_MA'], 'Signal'] = 1
+                
+                bt_df['Market_Returns'] = bt_df['Close'].pct_change()
+                bt_df['Strategy_Returns'] = bt_df['Market_Returns'] * bt_df['Signal'].shift(1)
+                
+                bt_df['Benchmark_Cum'] = (1 + bt_df['Market_Returns'].fillna(0)).cumprod() - 1
+                bt_df['Strategy_Cum'] = (1 + bt_df['Strategy_Returns'].fillna(0)).cumprod() - 1
+                
+                fig_bt = go.Figure()
+                fig_bt.add_trace(go.Scatter(x=bt_df.index, y=bt_df['Strategy_Cum'] * 100, mode='lines', name=f'双均线策略 ({fast_ma}/{slow_ma})', line=dict(color='#4CAF50')))
+                fig_bt.add_trace(go.Scatter(x=bt_df.index, y=bt_df['Benchmark_Cum'] * 100, mode='lines', name='买入并持有 (Benchmark)', line=dict(color='#a0a0a0', dash='dash')))
+                
+                fig_bt.update_layout(
+                    template="plotly_dark",
+                    title=f"【策略回测对比】 {resolved_trade_ticker} 累计收益率 (%)",
+                    xaxis_title="日期",
+                    yaxis_title="收益率 (%)"
+                )
+                st.plotly_chart(fig_bt, use_container_width=True)
+                
+                strat_total_return = bt_df['Strategy_Cum'].iloc[-1] * 100
+                bench_total_return = bt_df['Benchmark_Cum'].iloc[-1] * 100
+                strat_mdd, strat_sharpe = calculate_risk_metrics(bt_df['Strategy_Returns'].dropna())
+                
+                bcol1, bcol2, bcol3, bcol4 = st.columns(4)
+                bcol1.metric("策略总收益率", f"{strat_total_return:.2f}%")
+                bcol2.metric("基准总收益率", f"{bench_total_return:.2f}%")
+                bcol3.metric("策略最大回撤", f"{strat_mdd:.2f}%")
+                bcol4.metric("策略夏普比率", f"{strat_sharpe:.2f}")
+
+elif app_mode == "⚔️ AI Comparison (PK)":
+    st.subheader("⚔️ AI Stock Comparison & PK (双公司巅峰对决)")
     
     col_pk1, col_pk2 = st.columns(2)
     with col_pk1:
@@ -453,7 +571,7 @@ elif app_mode == "⚔️ Companies Comparison":
         query_b = st.text_input("Enter Company B:", "Microsoft", key="pk_comp_b")
         resolved_b = get_ticker_from_name(query_b)
 
-    if st.button(" Start", key="btn_run_pk"):
+    if st.button("🚀 开始 AI PK 对比评测", key="btn_run_pk"):
         if not resolved_a or not resolved_b:
             show_custom_alert("请输入两家有效的公司名称或代码", "error")
         else:

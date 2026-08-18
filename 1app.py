@@ -325,19 +325,34 @@ elif app_mode == "🪙 Trading System":
     if resolved_trade_ticker:
         try:
             trade_df = get_stock_data(resolved_trade_ticker, "1y")
+            if not trade_df.empty and 'Close' in trade_df.columns:
+                # 过滤掉 NaN，取最后一个有效收盘价
+                valid_closes = trade_df['Close'].dropna()
+                if not valid_closes.empty:
+                    trade_price = float(valid_closes.iloc[-1])
+            
+            # 如果历史数据取出来还是 NaN 或 0，走 info 兜底获取当前价
+            if pd.isna(trade_price) or trade_price == 0.0:
+                try:
+                    inf = yf.Ticker(resolved_trade_ticker).info
+                    trade_price = float(inf.get('currentPrice') or inf.get('regularMarketPrice') or inf.get('previousClose') or 0.0)
+                except:
+                    pass
+
             if not trade_df.empty:
-                trade_price = float(trade_df['Close'].iloc[-1])
                 trade_returns = trade_df['Close'].pct_change().dropna()
-                with col_tinfo:
-                    st.markdown(f"""
-                    <div style="background-color: #1a1a1a; padding: 10px 15px; border-radius: 6px; border: 1px solid #333333; color: #f0f0f0; margin-top: 24px;">
-                        <b>{resolved_trade_ticker}</b> | Latest Prices: <b style="color: #4CAF50;">${trade_price:.2f}</b>
-                    </div>
-                    """, unsafe_allow_html=True)
-            else:
+
+            with col_tinfo:
+                price_display = f"${trade_price:.2f}" if not pd.isna(trade_price) and trade_price > 0 else "N/A"
+                st.markdown(f"""
+                <div style="background-color: #1a1a1a; padding: 10px 15px; border-radius: 6px; border: 1px solid #333333; color: #f0f0f0; margin-top: 24px;">
+                    <b>{resolved_trade_ticker}</b> | Latest Prices: <b style="color: #4CAF50;">{price_display}</b>
+                </div>
+                """, unsafe_allow_html=True)
+            if trade_df.empty:
                 show_custom_alert("未找到该股票的行情数据，请检查输入。", "warning")
-        except:
-            show_custom_alert("获取行情失败。", "warning")
+        except Exception as e:
+            show_custom_alert(f"获取行情失败: {e}", "warning")
 
     st.markdown("---")
 

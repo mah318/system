@@ -394,7 +394,7 @@ elif app_mode == "🏆 Top 50 Companies":
     ]
 
     malaysia_companies = [
-        ("1155.KL", "MalayanBanking Bhd (Maybank)"), ("1295.KL", "Public Bank Bhd"),
+        ("1155.KL", "Malayan Banking Bhd (Maybank)"), ("1295.KL", "Public Bank Bhd"),
         ("1023.KL", "CIMB Group Holdings"), ("5347.KL", "Tenaga Nasional Bhd"),
         ("5183.KL", "Petronas Chemicals"), ("5225.KL", "IHH Healthcare"),
         ("5819.KL", "Hong Leong Bank"), ("8869.KL", "Press Metal Aluminium"),

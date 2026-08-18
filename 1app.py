@@ -300,6 +300,22 @@ if app_mode == "📊 Data Analysis":
                 col4.metric("利润率 (Profit Margin)", margin_str)
                 col5.metric("营收增长率 (Revenue Growth)", growth_str)
 
+            st.markdown("---")
+                st.subheader("🤖 AI Basic Fundamentals Analysis")
+                if api_key:
+                    try:
+                        client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
+                        fundamental_prompt = f"""请作为资深分析师，对 {primary_ticker} 的以下基本面数据进行专业研报点评：
+                        市盈率(PE): {pe_str}, 市净率(PB): {pb_str}, 利润率: {margin_str}, 营收增长: {growth_str}。
+                        请评价其估值是否合理，并简要概括财务健康状况。"""
+                        response = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": fundamental_prompt}])
+                        st.markdown(f"<div style='background:#1a1a1a; padding:15px; border-radius:8px;'>{response.choices[0].message.content}</div>", unsafe_allow_html=True)
+                    except Exception as e:
+                        st.error(f"AI Analysis error: {e}")
+                else:
+                    st.warning("API Key not configured.")
+                
+
             with tab2:
                 st.subheader(f"技术指标 : {primary_ticker}")
                 st.line_chart(df_primary[['RSI']])

@@ -396,36 +396,7 @@ elif app_mode == "🪙 Trading Syestem":
             else:
                 show_custom_alert("暂无行业数据", "info")
 
-        # 2. 组合资产相关性热力图
-        with col_heat:
-            st.markdown("#### 资产相关性热力图 (Correlation Heatmap)")
-            portfolio_tickers = list(st.session_state.portfolio.keys())
-            if len(portfolio_tickers) >= 2:
-                hist_data = {}
-                for t in portfolio_tickers:
-                    df_hist = get_stock_data(t, "3mo")
-                    if not df_hist.empty:
-                        hist_data[t] = df_hist['Close']
-                
-                if len(hist_data) >= 2:
-                    price_df = pd.DataFrame(hist_data).dropna()
-                    corr_matrix = price_df.corr()
-                    
-                    fig_heat = go.Figure(data=go.Heatmap(
-                        z=corr_matrix.values,
-                        x=corr_matrix.columns,
-                        y=corr_matrix.index,
-                        colorscale='Viridis',
-                        zmin=-1, zmax=1
-                    ))
-                    fig_heat.update_layout(template="plotly_dark", margin=dict(t=20, b=20, l=20, r=20))
-                    st.plotly_chart(fig_heat, use_container_width=True)
-                else:
-                    show_custom_alert("历史数据不足，无法生成相关性热力图", "info")
-            else:
-                show_custom_alert("至少需要持有 2 只不同的股票才能生成相关性热力图", "info")
-        # =======================================================================
-        
+      
     else:
        show_custom_alert("📦 No current holdings. Enter a ticker above to start paper trading!", "info")
 

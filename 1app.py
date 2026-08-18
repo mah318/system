@@ -309,11 +309,11 @@ elif app_mode == "🪙 Trading Syestem":
     col_buy, col_sell = st.columns(2)
     
     with col_buy:
-        st.markdown(f"#### 🟢 买入: `{resolved_trade_ticker}`")
+        st.markdown(f"#### 🟢 Buy: `{resolved_trade_ticker}`")
         buy_shares = st.number_input("买入股数", min_value=1, value=10, step=1, key="ind_buy_shares")
         total_cost = buy_shares * trade_price if trade_price > 0 else 0
         st.write(f"预计总花费: **${total_cost:,.2f}**")
-        if st.button("确认买入此标的", key="btn_ind_buy"):
+        if st.button("Confirm Buy", key="btn_ind_buy"):
             if trade_price <= 0:
                 show_custom_alert("无效的股票价格！", "error")
             elif st.session_state.cash >= total_cost:
@@ -334,7 +334,7 @@ elif app_mode == "🪙 Trading Syestem":
                 show_custom_alert("可用现金不足，无法买入！", "error")
 
     with col_sell:
-        st.markdown(f"#### 🔴 卖出: `{resolved_trade_ticker}`")
+        st.markdown(f"#### 🔴 Sell: `{resolved_trade_ticker}`")
         owned_shares = st.session_state.portfolio.get(resolved_trade_ticker, {}).get("shares", 0)
         st.write(f"当前持有该股票数量: **{owned_shares} 股**")
         
@@ -343,7 +343,7 @@ elif app_mode == "🪙 Trading Syestem":
         else:
             sell_shares = st.number_input("卖出股数", min_value=0, max_value=0, value=0, step=1, disabled=True, key="ind_sell_shares_disabled")
         
-        if st.button("确认卖出此标的", key="btn_ind_sell"):
+        if st.button("Confirm Sell", key="btn_ind_sell"):
             if owned_shares >= sell_shares > 0 and trade_price > 0:
                 earned_cash = sell_shares * trade_price
                 st.session_state.cash += earned_cash

@@ -1,20 +1,18 @@
 import streamlit as st
 import yfinance as yf
 import plotly.graph_objects as go
+from openai import OpenAI
 import pandas as pd
 import requests
 import json
 import os
-from openai import OpenAI
 
-# 配置项
+# ==================== 在这里直接内置你的 API Key ====================
+BUILTIN_API_KEY = "你的API_KEY填在这里" 
+# ==================================================================
+
+# 数据持久化文件路径
 DATA_FILE = "portfolio_data.json"
-BUILTIN_API_KEY = "你的API_KEY填在这里"
-
-# 页面配置
-st.set_page_config(page_title="Financial Terminal", layout="wide")
-
-# --- 功能函数区 ---
 
 def load_data():
     if os.path.exists(DATA_FILE):
@@ -33,8 +31,21 @@ def save_data():
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
+# 初始化模拟炒股账户资产 (从本地文件加载)
+saved_data = load_data()
+if 'cash' not in st.session_state:
+    st.session_state.cash = saved_data.get("cash", 100000.0)
+if 'portfolio' not in st.session_state:
+    st.session_state.portfolio = saved_data.get("portfolio", {})
+
+# 统一的暗黑主题提示框函数
 def show_custom_alert(text, alert_type="info"):
-    colors = {"info": "#a0a0a0", "success": "#4CAF50", "warning": "#FFA726", "error": "#EF5350"}
+    colors = {
+        "info": "#a0a0a0",
+        "success": "#4CAF50",
+        "warning": "#FFA726",
+        "error": "#EF5350"
+    }
     color = colors.get(alert_type, "#f0f0f0")
     st.markdown(f"""
     <div style="background-color: #1a1a1a; padding: 14px 20px; border-radius: 8px; border: 1px solid #333333; color: {color}; font-size: 14px; margin-bottom: 10px;">
@@ -42,11 +53,13 @@ def show_custom_alert(text, alert_type="info"):
     </div>
     """, unsafe_allow_html=True)
 
+# 智能公司名称/代码转换函数（支持中文名搜索）
 def get_ticker_from_name(query):
     query = query.strip()
-    if not query: return ""
+    if not query:
+        return ""
     url = f"https://query2.finance.yahoo.com/v1/finance/search?q={query}"
-    headers = {'User-Agent': 'Mozilla/5.0'}
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
     try:
         r = requests.get(url, headers=headers, timeout=5)
         data = r.json()
@@ -56,25 +69,24 @@ def get_ticker_from_name(query):
         pass
     return query.upper()
 
-@st.cache_data(ttl=3600)
+@st.cache_data
 def get_stock_data(ticker, period):
     stock = yf.Ticker(ticker)
-    return stock.history(period=period)
+    df = stock.history(period=period)
+    return df
 
-# --- 初始化状态 ---
-saved_data = load_data()
-if 'cash' not in st.session_state:
-    st.session_state.cash = saved_data.get("cash", 100000.0)
-if 'portfolio' not in st.session_state:
-    st.session_state.portfolio = saved_data.get("portfolio", {})
+st.set_page_config(page_title="Financial Terminal", layout="wide")
+st.title("📈 AI Financial Terminal ")
 
-# --- API Key 处理 ---
-api_key = st.secrets.get("GROQ_API_KEY", BUILTIN_API_KEY)
+# 优先从 secrets 读取，若无则使用上方定义的 BUILTIN_API_KEY
+try:
+    api_key = st.secrets["GROQ_API_KEY"]
+except:
+    api_key = BUILTIN_API_KEY
 
-# --- 主界面 ---
-st.title("📈 AI Financial Terminal")
-
-app_mode = st.sidebar.radio("Select Mode", ["📊 Data Analysis", "🪙 Trading System", "🏆 Top 50 Companies"])
+# 侧边栏：独立的功能模块切换器
+st.sidebar.header("Function")
+app_mode = st.sidebar.radio("Select Mode", ["📊 Data Analysis", "🪙 Trading Syestem", "🏆 Top 50 Companies"])
 
 if app_mode == "📊 Data Analysis":
     st.sidebar.header("Report Parameters")

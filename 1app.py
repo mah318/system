@@ -1,18 +1,20 @@
 import streamlit as st
 import yfinance as yf
 import plotly.graph_objects as go
-from openai import OpenAI
 import pandas as pd
 import requests
 import json
 import os
+from openai import OpenAI
 
-# ==================== 在这里直接内置你的 API Key ====================
-BUILTIN_API_KEY = "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" 
-# ==================================================================
-
-# 数据持久化文件路径
+# 配置项
 DATA_FILE = "portfolio_data.json"
+BUILTIN_API_KEY = "你的API_KEY填在这里"
+
+# 页面配置
+st.set_page_config(page_title="Financial Terminal", layout="wide")
+
+# --- 功能函数区 ---
 
 def load_data():
     if os.path.exists(DATA_FILE):
@@ -31,21 +33,8 @@ def save_data():
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
-# 初始化模拟炒股账户资产 (从本地文件加载)
-saved_data = load_data()
-if 'cash' not in st.session_state:
-    st.session_state.cash = saved_data.get("cash", 100000.0)
-if 'portfolio' not in st.session_state:
-    st.session_state.portfolio = saved_data.get("portfolio", {})
-
-# 统一的暗黑主题提示框函数
 def show_custom_alert(text, alert_type="info"):
-    colors = {
-        "info": "#a0a0a0",
-        "success": "#4CAF50",
-        "warning": "#FFA726",
-        "error": "#EF5350"
-    }
+    colors = {"info": "#a0a0a0", "success": "#4CAF50", "warning": "#FFA726", "error": "#EF5350"}
     color = colors.get(alert_type, "#f0f0f0")
     st.markdown(f"""
     <div style="background-color: #1a1a1a; padding: 14px 20px; border-radius: 8px; border: 1px solid #333333; color: {color}; font-size: 14px; margin-bottom: 10px;">
@@ -53,13 +42,11 @@ def show_custom_alert(text, alert_type="info"):
     </div>
     """, unsafe_allow_html=True)
 
-# 智能公司名称/代码转换函数（支持中文名搜索）
 def get_ticker_from_name(query):
     query = query.strip()
-    if not query:
-        return ""
+    if not query: return ""
     url = f"https://query2.finance.yahoo.com/v1/finance/search?q={query}"
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+    headers = {'User-Agent': 'Mozilla/5.0'}
     try:
         r = requests.get(url, headers=headers, timeout=5)
         data = r.json()
@@ -69,30 +56,32 @@ def get_ticker_from_name(query):
         pass
     return query.upper()
 
-@st.cache_data
+@st.cache_data(ttl=3600)
 def get_stock_data(ticker, period):
     stock = yf.Ticker(ticker)
-    df = stock.history(period=period)
-    return df
+    return stock.history(period=period)
 
-st.set_page_config(page_title="Financial Terminal", layout="wide")
-st.title("📈 AI Financial Terminal ")
+# --- 初始化状态 ---
+saved_data = load_data()
+if 'cash' not in st.session_state:
+    st.session_state.cash = saved_data.get("cash", 100000.0)
+if 'portfolio' not in st.session_state:
+    st.session_state.portfolio = saved_data.get("portfolio", {})
 
-# 优先从 secrets 读取，若无则使用上方定义的 BUILTIN_API_KEY
-try:
-    api_key = st.secrets["GROQ_API_KEY"]
-except:
-    api_key = BUILTIN_API_KEY
+# --- API Key 处理 ---
+api_key = st.secrets.get("GROQ_API_KEY", BUILTIN_API_KEY)
 
-# 侧边栏：独立的功能模块切换器
-st.sidebar.header("Function")
-app_mode = st.sidebar.radio("Select Mode", ["📊 Data Analysis", "🪙 Trading Syestem", "🏆 Top 50 Companies"])
+# --- 主界面 ---
+st.title("📈 AI Financial Terminal")
+
+app_mode = st.sidebar.radio("Select Mode", ["📊 Data Analysis", "🪙 Trading System", "🏆 Top 50 Companies"])
 
 if app_mode == "📊 Data Analysis":
     st.sidebar.header("Report Parameters")
     tickers_raw = st.sidebar.text_input("Enter Company Name:", "Apple")
     period = st.sidebar.selectbox("Time:", ["1D", "10D", "1mo", "3mo", "6mo", "1y", "10y", "20y"], index=2)
-    normalize = st.sidebar.checkbox("Normalize Comparison (Start from 0%)", value=True)
+    # 默认设为 False，直接展示股票绝对价格对比
+    normalize = st.sidebar.checkbox("Normalize Comparison (Start from 0%)", value=False)
 
     raw_inputs = [t.strip() for t in tickers_raw.split(',') if t.strip()]
     
@@ -121,7 +110,7 @@ if app_mode == "📊 Data Analysis":
                 y_data = (df['Close'] / df['Close'].iloc[0] - 1) * 100 if normalize else df['Close']
                 fig.add_trace(go.Scatter(x=df.index, y=y_data, mode='lines', name=t))
 
-            fig.update_layout(template="plotly_dark", title="收益率对比" if normalize else "价格对比")
+            fig.update_layout(template="plotly_dark", title="收益率对比 (%)" if normalize else "股票价格对比 (Price)")
             st.plotly_chart(fig, use_container_width=True)
 
             primary_ticker = tickers_input[0]
@@ -157,24 +146,28 @@ if app_mode == "📊 Data Analysis":
             latest = df_primary.iloc[-1]
 
             st.subheader(f"Dashboard: {primary_ticker}")
-            if not api_key or api_key == "你的API_KEY填在这里":
-                show_custom_alert("检测到未正确配置 API Key，请修改代码中的 BUILTIN_API_KEY。", "warning")
-            else:
-                try:
-                    client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
-                    
-                    models_response = client.models.list()
-                    available_models = [m.id for m in models_response.data]
-                    
-                    auto_model = available_models[0] if available_models else "openai/gpt-oss-120b"
-                    for m in available_models:
-                        if any(k in m.lower() for k in ['chat', 'versatile', 'instant', '8b', '70b', 'gpt-oss', 'instruct']):
-                            auto_model = m
-                            break
+            
+            # 引入分析按键
+            if st.button("🚀 运行 AI 智能量化分析", type="primary", key="btn_run_ai_analysis"):
+                if not api_key or api_key == "你的API_KEY填在这里":
+                    show_custom_alert("检测到未正确配置 API Key，请修改代码中的 BUILTIN_API_KEY。", "warning")
+                else:
+                    with st.spinner("AI 正在深度解析市场与财务数据，请稍候..."):
+                        try:
+                            client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
+                            
+                            models_response = client.models.list()
+                            available_models = [m.id for m in models_response.data]
+                            
+                            auto_model = available_models[0] if available_models else "openai/gpt-oss-120b"
+                            for m in available_models:
+                                if any(k in m.lower() for k in ['chat', 'versatile', 'instant', '8b', '70b', 'gpt-oss', 'instruct']):
+                                    auto_model = m
+                                    break
 
-                    tech_summary = f"RSI(14): {latest['RSI']:.2f}, MACD: {latest['MACD']:.2f}"
-                    
-                    signal_prompt = f"""你是一位资深的华尔街量化投资经理与风险控制专家。请基于以下多维财务与技术数据，对 {primary_ticker} 进行严谨的专业量化评估：
+                            tech_summary = f"RSI(14): {latest['RSI']:.2f}, MACD: {latest['MACD']:.2f}"
+                            
+                            signal_prompt = f"""你是一位资深的华尔街量化投资经理与风险控制专家。请基于以下多维财务与技术数据，对 {primary_ticker} 进行严谨的专业量化评估：
 
 - 核心技术面 (近1个月): {tech_summary}
 - 核心基本面: PE市盈率={pe_str}, PB市净率={pb_str}, 利润率={margin_str}, 营收增长={growth_str}
@@ -190,20 +183,22 @@ if app_mode == "📊 Data Analysis":
 【多空博弈核心逻辑】(60字以内，必须结合具体数字说明)
 【关键支撑与风控点】(各一句话，严格对应指标数据)
 """
-                    signal_response = client.chat.completions.create(
-                        model=auto_model,
-                        messages=[{"role": "user", "content": signal_prompt}]
-                    )
-                    ai_signal_text = signal_response.choices[0].message.content
-                    
-                    st.markdown(f"""
-                    <div style="background-color: #1a1a1a; padding: 18px; border-radius: 10px; border: 1px solid #333333; color: #f0f0f0; font-size: 15px; line-height: 1.7; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
-                        {ai_signal_text.replace('\n', '<br>')}
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                except Exception as ai_err:
-                    show_custom_alert(f"AI 智能决策请求失败: {ai_err}", "error")
+                            signal_response = client.chat.completions.create(
+                                model=auto_model,
+                                messages=[{"role": "user", "content": signal_prompt}]
+                            )
+                            ai_signal_text = signal_response.choices[0].message.content
+                            
+                            st.markdown(f"""
+                            <div style="background-color: #1a1a1a; padding: 18px; border-radius: 10px; border: 1px solid #333333; color: #f0f0f0; font-size: 15px; line-height: 1.7; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                                {ai_signal_text.replace('\n', '<br>')}
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                        except Exception as ai_err:
+                            show_custom_alert(f"AI 智能决策请求失败: {ai_err}", "error")
+            else:
+                show_custom_alert(f"💡 点击上方 **“🚀 运行 AI 智能量化分析”** 按钮即可生成针对 {primary_ticker} 的专业华尔街级研报评级。", "info")
 
             tab1, tab2, tab3 = st.tabs(["🏢 Fundamentals", "📊 Technical Indicators", "📋 Raw Data"])
 
@@ -222,9 +217,10 @@ if app_mode == "📊 Data Analysis":
                 st.write("**🤖 AI Fundamental Evaluation:**")
                 if api_key and api_key != "你的API_KEY填在这里":
                     try:
+                        client_fund = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
                         fund_prompt = f"基于 {primary_ticker} 的硬性数据（PE: {pe_str}, PB: {pb_str}, 利润率: {margin_str}, 营收增长: {growth_str}），请用数据推导列出5项核心基本面评价。"
-                        fund_response = client.chat.completions.create(
-                            model=auto_model,
+                        fund_response = client_fund.chat.completions.create(
+                            model="openai/gpt-oss-120b",
                             messages=[{"role": "user", "content": fund_prompt}]
                         )
                         st.write(fund_response.choices[0].message.content)
@@ -234,7 +230,7 @@ if app_mode == "📊 Data Analysis":
                     show_custom_alert("请先配置 API Key 以查看 AI 评估。", "warning")
 
             with tab2:
-                st.subheader(f"Technical Indicators : {primary_ticker}")
+                st.subheader(f"技术指标 : {primary_ticker}")
                 st.line_chart(df_primary[['RSI']])
                 st.line_chart(df_primary[['MACD', 'Signal']])
 
@@ -313,7 +309,7 @@ elif app_mode == "🪙 Trading Syestem":
         buy_shares = st.number_input("买入股数", min_value=1, value=10, step=1, key="ind_buy_shares")
         total_cost = buy_shares * trade_price if trade_price > 0 else 0
         st.write(f"预计总花费: **${total_cost:,.2f}**")
-        if st.button("Confirm Buy", key="btn_ind_buy"):
+        if st.button("Comform Buy", key="btn_ind_buy"):
             if trade_price <= 0:
                 show_custom_alert("无效的股票价格！", "error")
             elif st.session_state.cash >= total_cost:
@@ -343,7 +339,7 @@ elif app_mode == "🪙 Trading Syestem":
         else:
             sell_shares = st.number_input("卖出股数", min_value=0, max_value=0, value=0, step=1, disabled=True, key="ind_sell_shares_disabled")
         
-        if st.button("Confirm Sell", key="btn_ind_sell"):
+        if st.button("Comfirm Sell", key="btn_ind_sell"):
             if owned_shares >= sell_shares > 0 and trade_price > 0:
                 earned_cash = sell_shares * trade_price
                 st.session_state.cash += earned_cash
@@ -354,11 +350,11 @@ elif app_mode == "🪙 Trading Syestem":
                 
                 save_data() # 保存到本地文件
                 show_custom_alert(f"成功卖出 {sell_shares} 股 {resolved_trade_ticker}，获得现金 ${earned_cash:,.2f}！", "success")
-                st.rerun() 
+                st.rerun()
             else:
                 show_custom_alert("Insufficient holdings or no position to sell!", "error")
     st.markdown("---")
-    st.subheader("📦 Current Holding Detials")
+    st.subheader("📦 Current holdings details")
     if portfolio_details:
         st.dataframe(pd.DataFrame(portfolio_details), use_container_width=True)
     else:
@@ -367,10 +363,8 @@ elif app_mode == "🪙 Trading Syestem":
 elif app_mode == "🏆 Top 50 Companies":
     st.subheader("🏆 Market Leaders Ranking")
     
-    # 新增：市场选择器
     market_option = st.radio("Select Market:", ["Global (USA)", "Malaysia (Bursa)"], horizontal=True)
     
-    # 全球 Top 50 列表
     global_companies = [
         ("AAPL", "Apple Inc."), ("MSFT", "Microsoft Corporation"), ("NVDA", "NVIDIA Corporation"),
         ("GOOGL", "Alphabet Inc."), ("AMZN", "Amazon.com, Inc."), ("META", "Meta Platforms, Inc."),
@@ -391,7 +385,6 @@ elif app_mode == "🏆 Top 50 Companies":
         ("UBER", "Uber Technologies"), ("NKE", "NIKE, Inc."), ("PYPL", "PayPal Holdings")
     ]
 
-    # 马来西亚 Top 50 列表 (使用 .KL 后缀)
     malaysia_companies = [
         ("1155.KL", "Malayan Banking Bhd (Maybank)"), ("1295.KL", "Public Bank Bhd"),
         ("1023.KL", "CIMB Group Holdings"), ("5347.KL", "Tenaga Nasional Bhd"),
@@ -410,7 +403,6 @@ elif app_mode == "🏆 Top 50 Companies":
         ("5657.KL", "Petronas Dagangan"), ("1083.KL", "Hong Leong Financial")
     ]
 
-    # 根据选择确定列表
     target_list = global_companies if "Global" in market_option else malaysia_companies
     currency_symbol = "$" if "Global" in market_option else "RM"
 
@@ -421,7 +413,6 @@ elif app_mode == "🏆 Top 50 Companies":
             try:
                 stock = yf.Ticker(ticker)
                 inf = stock.info
-                # 兼容不同市场的价格获取方式
                 price = inf.get('currentPrice') or inf.get('regularMarketPrice') or 0
                 mcap = inf.get('marketCap') or 0
                 data_rows.append({

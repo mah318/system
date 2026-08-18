@@ -245,7 +245,7 @@ if app_mode == "📊 Data Analysis":
         except Exception as e:
             show_custom_alert(f"程序运行出错: {e}", "error")
 
-elif app_mode == "🪙 模拟交易系统":
+elif app_mode == "🪙 Demo Trading Syestem":
     st.subheader("🪙 模拟交易与资产管理系统")
     
     col_tinput, col_tinfo = st.columns([2, 3])

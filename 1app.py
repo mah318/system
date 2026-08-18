@@ -400,6 +400,64 @@ elif app_mode == "🪙 Trading Syestem":
     else:
        show_custom_alert("📦 No current holdings. Enter a ticker above to start paper trading!", "info")
 
+st.markdown("---")
+    st.subheader("⚡ Quantitative Strategy Backtesting (Moving Average Crossover)")
+    
+    col_bt1, col_bt2, col_bt3 = st.columns(3)
+    with col_bt1:
+        fast_ma = st.number_input("短期均线周期 (Fast MA)", min_value=5, max_value=50, value=20, step=1)
+    with col_bt2:
+        slow_ma = st.number_input("长期均线周期 (Slow MA)", min_value=20, max_value=200, value=50, step=1)
+    with col_bt3:
+        backtest_period = st.selectbox("回测历史跨度", ["6mo", "1y", "2y", "5y"], index=1)
+
+    if st.button("🚀 运行金叉/死叉策略回测", key="btn_run_backtest"):
+        if not resolved_trade_ticker:
+            show_custom_alert("请先输入有效的股票代码", "error")
+        else:
+            bt_df = get_stock_data(resolved_trade_ticker, backtest_period)
+            if bt_df.empty or len(bt_df) < slow_ma:
+                show_custom_alert("数据量太少，无法计算所选均线，请尝试缩短均线周期或加长回测跨度。", "warning")
+            else:
+                # 计算双均线
+                bt_df['Fast_MA'] = bt_df['Close'].rolling(window=int(fast_ma)).mean()
+                bt_df['Slow_MA'] = bt_df['Close'].rolling(window=int(slow_ma)).mean()
+                
+                # 生成信号：快线上穿慢线为1（买入/持仓），下穿为0（空仓）
+                bt_df['Signal'] = 0
+                bt_df.loc[bt_df['Fast_MA'] > bt_df['Slow_MA'], 'Signal'] = 1
+                
+                # 计算策略收益与基准（买入持有）收益
+                bt_df['Market_Returns'] = bt_df['Close'].pct_change()
+                bt_df['Strategy_Returns'] = bt_df['Market_Returns'] * bt_df['Signal'].shift(1)
+                
+                bt_df['Benchmark_Cum'] = (1 + bt_df['Market_Returns'].fillna(0)).cumprod() - 1
+                bt_df['Strategy_Cum'] = (1 + bt_df['Strategy_Returns'].fillna(0)).cumprod() - 1
+                
+                # 绘制回测收益对比图
+                fig_bt = go.Figure()
+                fig_bt.add_trace(go.Scatter(x=bt_df.index, y=bt_df['Strategy_Cum'] * 100, mode='lines', name=f'双均线策略 ({fast_ma}/{slow_ma})', line=dict(color='#4CAF50')))
+                fig_bt.add_trace(go.Scatter(x=bt_df.index, y=bt_df['Benchmark_Cum'] * 100, mode='lines', name='买入并持有 (Benchmark)', line=dict(color='#a0a0a0', dash='dash')))
+                
+                fig_bt.update_layout(
+                    template="plotly_dark",
+                    title=f"【策略回测对比】 {resolved_trade_ticker} 累计收益率 (%)",
+                    xaxis_title="日期",
+                    yaxis_title="收益率 (%)"
+                )
+                st.plotly_chart(fig_bt, use_container_width=True)
+                
+                # 计算策略表现关键指标
+                strat_total_return = bt_df['Strategy_Cum'].iloc[-1] * 100
+                bench_total_return = bt_df['Benchmark_Cum'].iloc[-1] * 100
+                strat_mdd, strat_sharpe = calculate_risk_metrics(bt_df['Strategy_Returns'].dropna())
+                
+                bcol1, bcol2, bcol3, bcol4 = st.columns(4)
+                bcol1.metric("策略总收益率", f"{strat_total_return:.2f}%")
+                bcol2.metric("基准总收益率", f"{bench_total_return:.2f}%")
+                bcol3.metric("策略最大回撤", f"{strat_mdd:.2f}%")
+                bcol4.metric("策略夏普比率", f"{strat_sharpe:.2f}")
+
 elif app_mode == "🏆 Top 50 Companies":
     st.subheader("🏆 Market Leaders Ranking")
     

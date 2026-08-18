@@ -219,16 +219,20 @@ if app_mode == "📊 Data Analysis":
 - 核心技术面 (近1个月): {tech_summary}
 - 核心基本面: PE市盈率={pe_str}, PB市净率={pb_str}, 利润率={margin_str}, 营收增长={growth_str}
 
-请遵循以下专业分析步骤（Chain of Thought）：
-1. 【多头逻辑】：结合上述数据，寻找支撑该股票的正面逻辑（如成长性、估值优势或技术面动能）。
+【排版绝对铁律】：
+1. 严禁使用 Markdown 表格 (|...|)，必须使用结构化的段落和分点列表。
+2. 保持排版清晰整洁，严禁换行错乱。
+
+请遵循以下专业分析步骤：
+1. 【多头逻辑】：结合上述数据，寻找支撑该股票的正面逻辑。
 2. 【空头风险】：结合上述数据，寻找潜在的下行风险或估值泡沫。
 3. 【综合裁决】：综合多空力量，给出客观评级。
 
 请严格按照以下格式输出：
 【操作评级】强烈买入 / 买入 / 持有观望 / 减持 / 卖出 (五选一)
-【置信度评分】(1-10分，评估你对该判断的确信程度)
-【多空博弈核心逻辑】(60字以内，必须结合具体数字说明)
-【关键支撑与风控点】(各一句话，严格对应指标数据)
+【置信度评分】(1-10分)
+【多空博弈核心逻辑】(60字以内)
+【关键支撑与风控点】(各一句话)
 """
                     signal_response = client.chat.completions.create(
                         model=auto_model,
@@ -260,10 +264,11 @@ if app_mode == "📊 Data Analysis":
 新闻列表：
 {chr(10).join([f'- {t}' for t in news_titles])}
 
+【排版要求】：严禁使用 Markdown 表格，使用清晰分点。
 请严格按以下格式输出：
 【舆情情感倾向】正面 / 中性 / 负面 (三选一)
-【舆情综合得分】(0-100分，分越高代表情绪越乐观)
-【核心事件与市场影响总结】(80字以内，分析这些新闻对股价的潜在短期影响)
+【舆情综合得分】(0-100分)
+【核心事件与市场影响总结】(80字以内)
 """
                         news_response = client.chat.completions.create(
                             model=auto_model,
@@ -293,21 +298,6 @@ if app_mode == "📊 Data Analysis":
                 col4, col5 = st.columns(2)
                 col4.metric("利润率 (Profit Margin)", margin_str)
                 col5.metric("营收增长率 (Revenue Growth)", growth_str)
-                
-                st.markdown("---")
-                st.write("**🤖 AI Fundamental Evaluation:**")
-                if api_key and api_key != "你的API_KEY填在这里":
-                    try:
-                        fund_prompt = f"基于 {primary_ticker} 的硬性数据（PE: {pe_str}, PB: {pb_str}, 利润率: {margin_str}, 营收增长: {growth_str}），请用数据推导列出5项核心基本面评价。"
-                        fund_response = client.chat.completions.create(
-                            model=auto_model,
-                            messages=[{"role": "user", "content": fund_prompt}]
-                        )
-                        st.write(fund_response.choices[0].message.content)
-                    except:
-                        show_custom_alert("基本面 AI 评估加载失败。", "error")
-                else:
-                    show_custom_alert("请先配置 API Key 以查看 AI 评估。", "warning")
 
             with tab2:
                 st.subheader(f"技术指标 : {primary_ticker}")
@@ -610,6 +600,10 @@ elif app_mode == "⚔️ AI Comparison (PK)":
 - 市净率 (PB): {data_b['PB']}
 - 利润率: {data_b['Margin']}
 - 营收增长: {data_b['Growth']}
+
+【排版绝对铁律】：
+1. 严禁使用任何 Markdown 表格 (|...|)，必须使用纯文本的标题与分点列表。
+2. 确保排版整洁、层级分明、绝不出现换行混乱。
 
 请从以下几个维度进行深度剖析：
 1. 【商业模式与护城河对比】：谁的护城河更深？核心壁垒是什么？

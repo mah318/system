@@ -319,6 +319,38 @@ if app_mode == "📊 Data Analysis":
                 st.subheader(f"技术指标 : {primary_ticker}")
                 st.line_chart(df_primary[['RSI']])
                 st.line_chart(df_primary[['MACD', 'Signal']])
+                
+                # 获取该股票的完整 OHLCV 数据
+                df_candle = get_stock_data(primary_ticker, period)
+                
+                if not df_candle.empty:
+                    # 创建 Candlestick 图表
+                    fig_candle = go.Figure(data=[go.Candlestick(
+                        x=df_candle.index,
+                        open=df_candle['Open'],
+                        high=df_candle['High'],
+                        low=df_candle['Low'],
+                        close=df_candle['Close'],
+                        name='Market Data'
+                    )])
+
+                    # 添加成交量 (Volume) 的子图层，看起来更像专业交易软件
+                    # 通过调整 layout 把图表和成交量叠在一起或上下分栏
+                    fig_candle.update_layout(
+                        template="plotly_dark",
+                        xaxis_rangeslider_visible=False, # 隐藏底部的 range slider 节省空间
+                        title=f"{primary_ticker} Candlestick Analysis",
+                        yaxis_title="Price",
+                        height=500
+                    )
+                    
+                    st.plotly_chart(fig_candle, use_container_width=True)
+                    
+                    # 额外展示 Moving Average (简单的技术指标示例)
+                    df_candle['SMA_20'] = df_candle['Close'].rolling(window=20).mean()
+                    st.line_chart(df_candle[['Close', 'SMA_20']])
+                else:
+                    st.warning("No technical data available.")
 
             with tab3:
                 st.subheader(f"{primary_ticker} 原始数据预览")

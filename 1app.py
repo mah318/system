@@ -3,6 +3,7 @@ import yfinance as yf
 import plotly.graph_objects as go
 from openai import OpenAI
 import pandas as pd
+import numpy as np
 import requests
 import json
 import os
@@ -78,6 +79,30 @@ def get_stock_data(ticker, period):
         return df
     except Exception:
         return pd.DataFrame()
+
+# 计算最大回撤与夏普比率辅助函数
+def calculate_risk_metrics(returns_series):
+    if returns_series.empty or len(returns_series) < 2:
+        return 0.0, 0.0
+    
+    # 计算累计收益率曲线
+    cum_returns = (1 + returns_series).cumprod()
+    # 计算历史最高点
+    peak = cum_returns.cummax()
+    # 计算回撤
+    drawdown = (cum_returns - peak) / peak
+    max_drawdown = float(drawdown.min()) * 100  # 转为百分比
+    
+    # 计算年化夏普比率 (假设无风险利率为 0%，每年 252 个交易日)
+    mean_daily_return = returns_series.mean()
+    std_daily_return = returns_series.std()
+    
+    if std_daily_return == 0 or np.isnan(std_daily_return):
+        sharpe_ratio = 0.0
+    else:
+        sharpe_ratio = float((mean_daily_return / std_daily_return) * np.sqrt(252))
+        
+    return max_drawdown, sharpe_ratio
 
 st.set_page_config(page_title="Financial Terminal", layout="wide")
 st.title("📈 AI Financial Terminal ")
@@ -250,7 +275,7 @@ if app_mode == "📊 Data Analysis":
             show_custom_alert(f"程序运行出错: {e}", "error")
 
 elif app_mode == "🪙 Trading Syestem":
-    st.subheader("🪙 Trading")
+    st.subheader("🪙 Trading & Quantitative Backtest")
     
     col_tinput, col_tinfo = st.columns([2, 3])
     with col_tinput:
@@ -258,11 +283,13 @@ elif app_mode == "🪙 Trading Syestem":
         resolved_trade_ticker = get_ticker_from_name(trade_query)
     
     trade_price = 0.0
+    trade_returns = pd.Series(dtype=float)
     if resolved_trade_ticker:
         try:
-            trade_df = get_stock_data(resolved_trade_ticker, "1D")
+            trade_df = get_stock_data(resolved_trade_ticker, "1y") # 默认取1年数据用于计算风控指标
             if not trade_df.empty:
                 trade_price = float(trade_df['Close'].iloc[-1])
+                trade_returns = trade_df['Close'].pct_change().dropna()
                 with col_tinfo:
                     st.markdown(f"""
                     <div style="background-color: #1a1a1a; padding: 10px 15px; border-radius: 6px; border: 1px solid #333333; color: #f0f0f0; margin-top: 24px;">
@@ -302,11 +329,17 @@ elif app_mode == "🪙 Trading Syestem":
     total_profit = total_assets - 100000.0
     total_profit_pct = (total_profit / 100000.0) * 100
 
-    mcol1, mcol2, mcol3, mcol4 = st.columns(4)
+    # 计算当前所查标的的风险指标 (最大回撤与夏普比率)
+    max_dd, sharpe = calculate_risk_metrics(trade_returns)
+
+    # 资产与量化风控指标看板 (6列)
+    mcol1, mcol2, mcol3, mcol4, mcol5, mcol6 = st.columns(6)
     mcol1.metric("账户总资产", f"${total_assets:,.2f}", f"{total_profit_pct:+.2f}%")
-    mcol2.metric("可用现金 (Cash)", f"${st.session_state.cash:,.2f}")
+    mcol2.metric("可用现金", f"${st.session_state.cash:,.2f}")
     mcol3.metric("持仓市值", f"${total_stock_value:,.2f}")
     mcol4.metric("累计盈亏", f"${total_profit:+,.2f}")
+    mcol5.metric(f"最大回撤 ({resolved_trade_ticker})", f"{max_dd:.2f}%")
+    mcol6.metric(f"夏普比率 ({resolved_trade_ticker})", f"{sharpe:.2f}")
 
     st.markdown("---")
     
@@ -367,13 +400,12 @@ elif app_mode == "🪙 Trading Syestem":
     if portfolio_details:
         st.dataframe(pd.DataFrame(portfolio_details), use_container_width=True)
         
-        # ================= 新增功能：行业分布饼图与相关性热力图 =================
+        # 行业分布饼图与相关性热力图
         st.markdown("---")
         st.subheader("📊 Portfolio Risk & Distribution Analysis")
         
         col_pie, col_heat = st.columns(2)
         
-        # 1. 行业/板块分布饼图
         with col_pie:
             st.markdown("#### 行业板块分布 (Sector Allocation)")
             sector_allocation = {}
@@ -396,11 +428,38 @@ elif app_mode == "🪙 Trading Syestem":
             else:
                 show_custom_alert("暂无行业数据", "info")
 
-      
+        with col_heat:
+            st.markdown("#### 资产相关性热力图 (Correlation Heatmap)")
+            portfolio_tickers = list(st.session_state.portfolio.keys())
+            if len(portfolio_tickers) >= 2:
+                hist_data = {}
+                for t in portfolio_tickers:
+                    df_hist = get_stock_data(t, "3mo")
+                    if not df_hist.empty:
+                        hist_data[t] = df_hist['Close']
+                
+                if len(hist_data) >= 2:
+                    price_df = pd.DataFrame(hist_data).dropna()
+                    corr_matrix = price_df.corr()
+                    
+                    fig_heat = go.Figure(data=go.Heatmap(
+                        z=corr_matrix.values,
+                        x=corr_matrix.columns,
+                        y=corr_matrix.index,
+                        colorscale='Viridis',
+                        zmin=-1, zmax=1
+                    ))
+                    fig_heat.update_layout(template="plotly_dark", margin=dict(t=20, b=20, l=20, r=20))
+                    st.plotly_chart(fig_heat, use_container_width=True)
+                else:
+                    show_custom_alert("历史数据不足，无法生成相关性热力图", "info")
+            else:
+                show_custom_alert("至少需要持有 2 只不同的股票才能生成相关性热力图", "info")
     else:
        show_custom_alert("📦 No current holdings. Enter a ticker above to start paper trading!", "info")
 
-st.markdown("---")
+    # ================= 新增功能：双均线策略回测 (Golden / Death Cross Backtest) =================
+    st.markdown("---")
     st.subheader("⚡ Quantitative Strategy Backtesting (Moving Average Crossover)")
     
     col_bt1, col_bt2, col_bt3 = st.columns(3)
@@ -457,6 +516,7 @@ st.markdown("---")
                 bcol2.metric("基准总收益率", f"{bench_total_return:.2f}%")
                 bcol3.metric("策略最大回撤", f"{strat_mdd:.2f}%")
                 bcol4.metric("策略夏普比率", f"{strat_sharpe:.2f}")
+    # =========================================================================================================
 
 elif app_mode == "🏆 Top 50 Companies":
     st.subheader("🏆 Market Leaders Ranking")

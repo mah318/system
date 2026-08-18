@@ -533,7 +533,7 @@ elif app_mode == "⚔️ Companies Comparison":
         query_b = st.text_input("Enter Company B:", "Microsoft", key="pk_comp_b")
         resolved_b = get_ticker_from_name(query_b)
 
-    if st.button("🚀 开始 AI PK 对比评测", key="btn_run_pk"):
+    if st.button("Start", key="btn_run_pk"):
         if not resolved_a or not resolved_b:
             show_custom_alert("请输入两家有效的公司名称或代码", "error")
         else:

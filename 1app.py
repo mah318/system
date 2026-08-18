@@ -126,7 +126,7 @@ except:
 
 # 侧边栏：独立的功能模块切换器
 st.sidebar.header("Function")
-app_mode = st.sidebar.radio("Select Mode", ["📊 Data Analysis", "🪙 Trading System", "⚔️ AI Comparison (PK)", "🏆 Top 50 Companies"])
+app_mode = st.sidebar.radio("Select Mode", ["📊 Data Analysis", "🪙 Trading System", "⚔️ Companies Comparison", "🏆 Top 50 Companies"])
 
 if app_mode == "📊 Data Analysis":
     st.sidebar.header("Report Parameters")
@@ -545,8 +545,8 @@ elif app_mode == "🪙 Trading System":
                 bcol3.metric("策略最大回撤", f"{strat_mdd:.2f}%")
                 bcol4.metric("策略夏普比率", f"{strat_sharpe:.2f}")
 
-elif app_mode == "⚔️ AI Comparison (PK)":
-    st.subheader("⚔️ AI Stock Comparison & PK (双公司巅峰对决)")
+elif app_mode == "⚔️ Companies Comparison":
+    st.subheader("⚔️ Companies Stock Comparison )")
     
     col_pk1, col_pk2 = st.columns(2)
     with col_pk1:
@@ -556,7 +556,7 @@ elif app_mode == "⚔️ AI Comparison (PK)":
         query_b = st.text_input("Enter Company B:", "Microsoft", key="pk_comp_b")
         resolved_b = get_ticker_from_name(query_b)
 
-    if st.button("🚀 开始 AI PK 对比评测", key="btn_run_pk"):
+    if st.button(" Start", key="btn_run_pk"):
         if not resolved_a or not resolved_b:
             show_custom_alert("请输入两家有效的公司名称或代码", "error")
         else:

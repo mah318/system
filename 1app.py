@@ -13,20 +13,6 @@ import concurrent.futures
 BUILTIN_API_KEY = "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"
 # ==================================================================
 
-import streamlit as st
-import yfinance as yf
-import plotly.graph_objects as go
-from openai import OpenAI
-import pandas as pd
-import numpy as np
-import requests
-import json
-import os
-import concurrent.futures
-
-# ==================== 在这里直接内置你的 API Key ====================
-BUILTIN_API_KEY = "你的API_KEY填在这里" 
-# ==================================================================
 
 # 数据持久化文件路径
 DATA_FILE = "portfolio_data.json"

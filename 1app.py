@@ -96,26 +96,6 @@ def get_stock_news(ticker):
     except:
         return []
 
-# 计算最大回撤与夏普比率辅助函数
-def calculate_risk_metrics(returns_series):
-    if returns_series.empty or len(returns_series) < 2:
-        return 0.0, 0.0
-    
-    cum_returns = (1 + returns_series).cumprod()
-    peak = cum_returns.cummax()
-    drawdown = (cum_returns - peak) / peak
-    max_drawdown = float(drawdown.min()) * 100
-    
-    mean_daily_return = returns_series.mean()
-    std_daily_return = returns_series.std()
-    
-    if std_daily_return == 0 or np.isnan(std_daily_return):
-        sharpe_ratio = 0.0
-    else:
-        sharpe_ratio = float((mean_daily_return / std_daily_return) * np.sqrt(252))
-        
-    return max_drawdown, sharpe_ratio
-
 st.set_page_config(page_title="Financial Terminal", layout="wide")
 st.title("📈 AI Financial Terminal ")
 

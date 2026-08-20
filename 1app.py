@@ -15,13 +15,12 @@ st.set_page_config(page_title="AI Financial Terminal", layout="wide")
 BUILTIN_API_KEY = "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"
 # =================================================================-
 
-# 创建全局带 User-Agent 的请求会话，防止被 Yahoo Finance 拦截
+# 创建全局带 User-Agent 的请求会话
 session = requests.Session()
 session.headers.update({
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 })
 
-# 使用 Streamlit 原生的 query_params 实现零依赖的云端持久化
 def load_data():
     try:
         encoded_data = st.query_params.get("portfolio_data", None)
@@ -43,14 +42,12 @@ def save_data():
     except Exception as e:
         print(f"Save error: {e}")
 
-# 初始化模拟炒股账户资产 (从 URL 缓存加载)
 saved_data = load_data()
 if 'cash' not in st.session_state:
     st.session_state.cash = saved_data.get("cash", 100000.0)
 if 'portfolio' not in st.session_state:
     st.session_state.portfolio = saved_data.get("portfolio", {})
 
-# 统一的暗黑主题提示框函数
 def show_custom_alert(text, alert_type="info"):
     colors = {
         "info": "#a0a0a0",
@@ -65,7 +62,6 @@ def show_custom_alert(text, alert_type="info"):
     </div>
     """, unsafe_allow_html=True)
 
-# 智能公司名称/代码转换函数（带缓存防限流）
 @st.cache_data(ttl=3600)
 def get_ticker_from_name(query):
     query = query.strip()
@@ -90,30 +86,48 @@ def get_stock_data(ticker, period):
     except Exception:
         return pd.DataFrame()
 
-# 缓存股票基础信息，防止触发 429 限流
-# 缓存股票基础信息，增加 fast_info 降级兜底，防止全部显示 N/A
+# 采用 Yahoo 官方 v7 接口获取基本面，彻底解决 N/A 问题
 @st.cache_data(ttl=600)
 def get_stock_info(ticker):
     try:
-        stock = yf.Ticker(ticker, session=session)
-        info = stock.info
-        
-        # 如果 .info 被拦截返回空，使用 fast_info 进行兜底补救
-        if not info or len(info) < 5:
-            fi = stock.fast_info
-            info = {
-                'marketCap': getattr(fi, 'market_cap', 'N/A'),
-                'currentPrice': getattr(fi, 'last_price', 'N/A'),
-                'trailingPE': 'N/A',
-                'priceToBook': 'N/A',
-                'profitMargins': 'N/A',
-                'revenueGrowth': 'N/A'
+        url = f"https://query2.finance.yahoo.com/v7/finance/quote?symbols={ticker}"
+        r = session.get(url, timeout=5)
+        data = r.json()
+        result = data.get('quoteResponse', {}).get('result', [])
+        if result:
+            q = result[0]
+            return {
+                'marketCap': q.get('marketCap', 'N/A'),
+                'currentPrice': q.get('regularMarketPrice', 'N/A'),
+                'trailingPE': q.get('trailingPE', 'N/A'),
+                'priceToBook': q.get('priceToBook', 'N/A'),
+                'profitMargins': q.get('profitMargins', 'N/A'),
+                'revenueGrowth': q.get('revenueGrowth', 'N/A'),
+                'shortName': q.get('shortName', ticker),
+                'sector': q.get('sector', 'Others')
             }
-        return info
     except Exception:
+        pass
+    
+    # 终极兜底：通过 yfinance fast_info 获取基础价格和市值
+    try:
+        stock = yf.Ticker(ticker, session=session)
+        fi = stock.fast_info
+        df = stock.history(period="1d")
+        price = float(df['Close'].iloc[-1]) if not df.empty else 'N/A'
+        return {
+            'marketCap': getattr(fi, 'market_cap', 'N/A'),
+            'currentPrice': price,
+            'trailingPE': 'N/A',
+            'priceToBook': 'N/A',
+            'profitMargins': 'N/A',
+            'revenueGrowth': 'N/A',
+            'shortName': ticker,
+            'sector': 'Others'
+        }
+    except:
         return {}
 
-# 获取股票最新新闻标题（带缓存）
 @st.cache_data(ttl=600)
 def get_stock_news(ticker):
     try:
@@ -129,7 +143,6 @@ def get_stock_news(ticker):
     except:
         return []
 
-# 计算最大回撤与夏普比率辅助函数
 def calculate_risk_metrics(returns_series):
     if returns_series.empty or len(returns_series) < 2:
         return 0.0, 0.0
@@ -147,13 +160,11 @@ def calculate_risk_metrics(returns_series):
 
 st.title("📈 AI Financial Terminal ")
 
-# 优先从 secrets 读取，若无则使用内置 BUILTIN_API_KEY
 try:
     api_key = st.secrets["GROQ_API_KEY"]
 except:
     api_key = BUILTIN_API_KEY
 
-# 侧边栏：独立的功能模块切换器
 st.sidebar.header("Function")
 app_mode = st.sidebar.radio("Select Mode", ["📊 Data Analysis", "🪙 Trading System", "⚔️ Companies Comparison", "🏆 Top 50 Companies"])
 
@@ -277,7 +288,6 @@ if app_mode == "📊 Data Analysis":
                 except Exception as ai_err:
                     show_custom_alert(f"AI 智能决策请求失败: {ai_err}", "error")
 
-            # 新增功能：实时新闻舆情分析模块
             st.markdown("---")
             st.subheader(f"📰 News Sentiment & Analysis: {primary_ticker}")
             news_titles = get_stock_news(primary_ticker)
@@ -402,7 +412,7 @@ elif app_mode == "🪙 Trading System":
             if pd.isna(trade_price) or trade_price == 0.0:
                 try:
                     inf = get_stock_info(resolved_trade_ticker)
-                    trade_price = float(inf.get('currentPrice') or inf.get('regularMarketPrice') or inf.get('previousClose') or 0.0)
+                    trade_price = float(inf.get('currentPrice') or 0.0)
                 except:
                     pass
 
@@ -448,8 +458,6 @@ elif app_mode == "🪙 Trading System":
     total_assets = st.session_state.cash + total_stock_value
     total_profit = total_assets - 100000.0
     total_profit_pct = (total_profit / 100000.0) * 100
-
-    max_dd, sharpe = calculate_risk_metrics(trade_returns)
 
     mcol1, mcol2, mcol3, mcol4, mcol5, mcol6 = st.columns(6)
     mcol1.metric("账户总资产", f"${total_assets:,.2f}", f"{total_profit_pct:+.2f}%")
@@ -672,8 +680,8 @@ elif app_mode == "🏆 Top 50 Companies":
             ticker, name = item
             try:
                 inf = get_stock_info(ticker)
-                price = inf.get('currentPrice') or inf.get('regularMarketPrice') or 0
-                mcap = inf.get('marketCap') or 0
+                price = inf.get('currentPrice') if isinstance(inf.get('currentPrice'), (int, float)) else 0
+                mcap = inf.get('marketCap') if isinstance(inf.get('marketCap'), (int, float)) else 0
                 return {
                     "Ticker": ticker,
                     "Company": name,

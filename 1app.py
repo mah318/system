@@ -13,7 +13,7 @@ st.set_page_config(page_title="AI Financial Terminal", layout="wide")
 
 # ==================== 在这里直接内置你的 API Key ====================
 BUILTIN_API_KEY = "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"
-# ==================================================================
+# =================================================================-
 
 # 创建全局带 User-Agent 的请求会话，防止被 Yahoo Finance 拦截
 session = requests.Session()
@@ -39,7 +39,6 @@ def save_data():
             "portfolio": st.session_state.portfolio
         }
         json_str = json.dumps(data, ensure_ascii=False)
-        # 将资产数据实时同步到浏览器 URL 中，服务器重启也不会丢
         st.query_params["portfolio_data"] = urllib.parse.quote(json_str)
     except Exception as e:
         print(f"Save error: {e}")
@@ -66,7 +65,8 @@ def show_custom_alert(text, alert_type="info"):
     </div>
     """, unsafe_allow_html=True)
 
-# 智能公司名称/代码转换函数（支持中文名搜索）
+# 智能公司名称/代码转换函数（带缓存防限流）
+@st.cache_data(ttl=3600)
 def get_ticker_from_name(query):
     query = query.strip()
     if not query:
@@ -81,7 +81,7 @@ def get_ticker_from_name(query):
         pass
     return query.upper()
 
-@st.cache_data
+@st.cache_data(ttl=600)
 def get_stock_data(ticker, period):
     try:
         stock = yf.Ticker(ticker, session=session)
@@ -90,7 +90,17 @@ def get_stock_data(ticker, period):
     except Exception:
         return pd.DataFrame()
 
-# 获取股票最新新闻标题
+# 缓存股票基础信息，防止触发 429 限流
+@st.cache_data(ttl=600)
+def get_stock_info(ticker):
+    try:
+        stock = yf.Ticker(ticker, session=session)
+        return stock.info
+    except Exception:
+        return {}
+
+# 获取股票最新新闻标题（带缓存）
+@st.cache_data(ttl=600)
 def get_stock_news(ticker):
     try:
         stock = yf.Ticker(ticker, session=session)
@@ -172,11 +182,10 @@ if app_mode == "📊 Data Analysis":
             primary_ticker = tickers_input[0]
             df_primary = get_stock_data(primary_ticker, period)
             if df_primary.empty:
-                show_custom_alert(f"未获取到 {primary_ticker} 的行情数据。", "error")
+                show_custom_alert(f"未获取到 {primary_ticker} 的行情数据（可能触发了 Yahoo 频率限制，请稍后再试）。", "error")
                 st.stop()
                 
-            stock_primary = yf.Ticker(primary_ticker, session=session)
-            info = stock_primary.info
+            info = get_stock_info(primary_ticker)
             raw_market_cap = info.get('marketCap', 'N/A')
             raw_pe = info.get('trailingPE', 'N/A')
             raw_pb = info.get('priceToBook', 'N/A')
@@ -378,7 +387,7 @@ elif app_mode == "🪙 Trading System":
             
             if pd.isna(trade_price) or trade_price == 0.0:
                 try:
-                    inf = yf.Ticker(resolved_trade_ticker, session=session).info
+                    inf = get_stock_info(resolved_trade_ticker)
                     trade_price = float(inf.get('currentPrice') or inf.get('regularMarketPrice') or inf.get('previousClose') or 0.0)
                 except:
                     pass
@@ -506,7 +515,7 @@ elif app_mode == "🪙 Trading System":
                 cur_p = float(latest_df['Close'].iloc[-1]) if not latest_df.empty else data["avg_price"]
                 market_val = shares * cur_p
                 try:
-                    sector = yf.Ticker(t, session=session).info.get('sector', 'Others')
+                    sector = get_stock_info(t).get('sector', 'Others')
                 except:
                     sector = 'Others'
                 sector_allocation[sector] = sector_allocation.get(sector, 0.0) + market_val
@@ -536,8 +545,8 @@ elif app_mode == "⚔️ Companies Comparison":
         else:
             with st.spinner("正在获取双方财务数据与基本面信息并进行 AI 深度对比..."):
                 try:
-                    info_a = yf.Ticker(resolved_a, session=session).info
-                    info_b = yf.Ticker(resolved_b, session=session).info
+                    info_a = get_stock_info(resolved_a)
+                    info_b = get_stock_info(resolved_b)
                     
                     data_a = {
                         "Ticker": resolved_a,
@@ -648,8 +657,7 @@ elif app_mode == "🏆 Top 50 Companies":
         def get_single_stock_info(item):
             ticker, name = item
             try:
-                stock = yf.Ticker(ticker, session=session)
-                inf = stock.info
+                inf = get_stock_info(ticker)
                 price = inf.get('currentPrice') or inf.get('regularMarketPrice') or 0
                 mcap = inf.get('marketCap') or 0
                 return {

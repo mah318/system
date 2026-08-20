@@ -91,11 +91,25 @@ def get_stock_data(ticker, period):
         return pd.DataFrame()
 
 # 缓存股票基础信息，防止触发 429 限流
+# 缓存股票基础信息，增加 fast_info 降级兜底，防止全部显示 N/A
 @st.cache_data(ttl=600)
 def get_stock_info(ticker):
     try:
         stock = yf.Ticker(ticker, session=session)
-        return stock.info
+        info = stock.info
+        
+        # 如果 .info 被拦截返回空，使用 fast_info 进行兜底补救
+        if not info or len(info) < 5:
+            fi = stock.fast_info
+            info = {
+                'marketCap': getattr(fi, 'market_cap', 'N/A'),
+                'currentPrice': getattr(fi, 'last_price', 'N/A'),
+                'trailingPE': 'N/A',
+                'priceToBook': 'N/A',
+                'profitMargins': 'N/A',
+                'revenueGrowth': 'N/A'
+            }
+        return info
     except Exception:
         return {}
 

@@ -86,47 +86,79 @@ def get_stock_data(ticker, period):
     except Exception:
         return pd.DataFrame()
 
-# 采用 Yahoo 官方 v7 接口获取基本面，彻底解决 N/A 问题
+def extract_val(val, default='N/A'):
+    if isinstance(val, dict):
+        return val.get('raw', default)
+    return val if val is not None else default
+
+# 采用 Yahoo 官方 v10 与 v7 复合接口获取全套基本面数据，根治 N/A 问题
 @st.cache_data(ttl=600)
 def get_stock_info(ticker):
+    info = {
+        'marketCap': 'N/A',
+        'currentPrice': 'N/A',
+        'trailingPE': 'N/A',
+        'priceToBook': 'N/A',
+        'profitMargins': 'N/A',
+        'revenueGrowth': 'N/A',
+        'shortName': ticker,
+        'sector': 'Others'
+    }
+    
+    # 1. 优先通过 v10 quoteSummary 获取深层基本面（PE, PB, 利润率, 营收增长等）
     try:
-        url = f"https://query2.finance.yahoo.com/v7/finance/quote?symbols={ticker}"
-        r = session.get(url, timeout=5)
+        url_v10 = f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{ticker}?modules=defaultKeyStatistics,financialData,summaryDetail,assetProfile"
+        r = session.get(url_v10, timeout=5)
         data = r.json()
-        result = data.get('quoteResponse', {}).get('result', [])
-        if result:
-            q = result[0]
-            return {
-                'marketCap': q.get('marketCap', 'N/A'),
-                'currentPrice': q.get('regularMarketPrice', 'N/A'),
-                'trailingPE': q.get('trailingPE', 'N/A'),
-                'priceToBook': q.get('priceToBook', 'N/A'),
-                'profitMargins': q.get('profitMargins', 'N/A'),
-                'revenueGrowth': q.get('revenueGrowth', 'N/A'),
-                'shortName': q.get('shortName', ticker),
-                'sector': q.get('sector', 'Others')
-            }
+        res_list = data.get('quoteSummary', {}).get('result', [])
+        if res_list:
+            res = res_list[0]
+            
+            sd = res.get('summaryDetail', {})
+            if sd:
+                info['marketCap'] = extract_val(sd.get('marketCap'), info['marketCap'])
+                info['trailingPE'] = extract_val(sd.get('trailingPE'), info['trailingPE'])
+                info['currentPrice'] = extract_val(sd.get('regularMarketPrice', sd.get('previousClose')), info['currentPrice'])
+
+            stats = res.get('defaultKeyStatistics', {})
+            if stats:
+                if info['trailingPE'] == 'N/A':
+                    info['trailingPE'] = extract_val(stats.get('trailingPE'), 'N/A')
+                info['priceToBook'] = extract_val(stats.get('priceToBook'), 'N/A')
+
+            fin = res.get('financialData', {})
+            if fin:
+                info['profitMargins'] = extract_val(fin.get('profitMargins'), 'N/A')
+                info['revenueGrowth'] = extract_val(fin.get('revenueGrowth'), 'N/A')
+                if info['currentPrice'] == 'N/A':
+                    info['currentPrice'] = extract_val(fin.get('currentPrice'), 'N/A')
+
+            prof = res.get('assetProfile', {})
+            if prof:
+                info['sector'] = prof.get('sector', 'Others')
+                info['shortName'] = res.get('summaryProfile', {}).get('longName', ticker)
     except Exception:
         pass
-    
-    # 终极兜底：通过 yfinance fast_info 获取基础价格和市值
-    try:
-        stock = yf.Ticker(ticker, session=session)
-        fi = stock.fast_info
-        df = stock.history(period="1d")
-        price = float(df['Close'].iloc[-1]) if not df.empty else 'N/A'
-        return {
-            'marketCap': getattr(fi, 'market_cap', 'N/A'),
-            'currentPrice': price,
-            'trailingPE': 'N/A',
-            'priceToBook': 'N/A',
-            'profitMargins': 'N/A',
-            'revenueGrowth': 'N/A',
-            'shortName': ticker,
-            'sector': 'Others'
-        }
-    except:
-        return {}
+
+    # 2. 如果部分指标仍缺失，使用 v7 接口进行补充
+    if info['marketCap'] == 'N/A' or info['trailingPE'] == 'N/A' or info['priceToBook'] == 'N/A':
+        try:
+            url_v7 = f"https://query2.finance.yahoo.com/v7/finance/quote?symbols={ticker}"
+            r = session.get(url_v7, timeout=5)
+            data = r.json()
+            result = data.get('quoteResponse', {}).get('result', [])
+            if result:
+                q = result[0]
+                if info['marketCap'] == 'N/A': info['marketCap'] = q.get('marketCap', 'N/A')
+                if info['currentPrice'] == 'N/A': info['currentPrice'] = q.get('regularMarketPrice', 'N/A')
+                if info['trailingPE'] == 'N/A': info['trailingPE'] = q.get('trailingPE', 'N/A')
+                if info['priceToBook'] == 'N/A': info['priceToBook'] = q.get('priceToBook', 'N/A')
+                if info['sector'] == 'Others': info['sector'] = q.get('sector', 'Others')
+                info['shortName'] = q.get('shortName', ticker)
+        except Exception:
+            pass
+
+    return info
 
 @st.cache_data(ttl=600)
 def get_stock_news(ticker):
@@ -142,21 +174,6 @@ def get_stock_news(ticker):
         return titles[:5]
     except:
         return []
-
-def calculate_risk_metrics(returns_series):
-    if returns_series.empty or len(returns_series) < 2:
-        return 0.0, 0.0
-    cum_returns = (1 + returns_series).cumprod()
-    peak = cum_returns.cummax()
-    drawdown = (cum_returns - peak) / peak
-    max_drawdown = float(drawdown.min()) * 100
-    mean_daily_return = returns_series.mean()
-    std_daily_return = returns_series.std()
-    if std_daily_return == 0 or np.isnan(std_daily_return):
-        sharpe_ratio = 0.0
-    else:
-        sharpe_ratio = float((mean_daily_return / std_daily_return) * np.sqrt(252))
-    return max_drawdown, sharpe_ratio
 
 st.title("📈 AI Financial Terminal ")
 
@@ -614,7 +631,7 @@ elif app_mode == "⚔️ Companies Comparison":
 1. 【商业模式与护城河对比】：谁的护城河更深？核心壁垒是什么？
 2. 【财务健康与估值优劣】：结合 PE, PB, 利润率与增长率，谁的性价比更高？
 3. 【增长潜力与未来催化剂】：谁在未来更有爆发力或更稳健？
-4. 【最终裁决 (Winner)】：明确给出更推荐哪一家，并给出核心理由。
+4. 【最终裁决 (Winner)】: 明确给出更推荐哪一家，并给出核心理由。
 """
                     pk_response = client.chat.completions.create(
                         model="openai/gpt-oss-120b",

@@ -137,6 +137,7 @@ def get_deep_financials(ticker):
     stock = yf.Ticker(ticker, session=session)
     info = stock.info
     
+    # 提取核心健康指标，若获取不到则返回 None
     metrics = {
         'debtToEquity': info.get('debtToEquity'),
         'quickRatio': info.get('quickRatio'),
@@ -145,13 +146,15 @@ def get_deep_financials(ticker):
         'freeCashFlow': 'N/A'
     }
     
+    # 尝试提取自由现金流
     try:
         cf = stock.cashflow
         if cf is not None and not cf.empty:
-            # 尝试获取自由现金流
-            operating_cf = cf.loc['Free Cash Flow'].iloc[0] if 'Free Cash Flow' in cf.index else None
-            if operating_cf:
-                metrics['freeCashFlow'] = operating_cf
+            # 兼容不同结构的财报字段查找
+            if 'Free Cash Flow' in cf.index:
+                metrics['freeCashFlow'] = cf.loc['Free Cash Flow'].iloc[0]
+            elif 'FreeCashFlow' in cf.index:
+                metrics['freeCashFlow'] = cf.loc['FreeCashFlow'].iloc[0]
     except:
         pass
         

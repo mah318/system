@@ -5,9 +5,8 @@ from openai import OpenAI
 import pandas as pd
 import numpy as np
 import requests
-import json
-import os
 import concurrent.futures
+import streamlit_localstorage as sl
 
 st.set_page_config(page_title="AI Financial Terminal", layout="wide")
 
@@ -15,22 +14,24 @@ st.set_page_config(page_title="AI Financial Terminal", layout="wide")
 BUILTIN_API_KEY = "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"
 # ==================================================================
 
-# 创建全局带 User-Agent 的请求会话，防止被 Yahoo Finance 拦截导致获取不到数据
+# 创建全局带 User-Agent 的请求会话，防止被 Yahoo Finance 拦截
 session = requests.Session()
 session.headers.update({
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 })
 
-# 数据持久化文件路径
-DATA_FILE = "portfolio_data.json"
+# 初始化浏览器本地存储组件
+localS = sl.LocalStorage()
 
 def load_data():
-    if os.path.exists(DATA_FILE):
-        try:
-            with open(DATA_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except:
-            pass
+    try:
+        # 从浏览器 LocalStorage 读取数据
+        data = localS.getItem("ai_financial_portfolio")
+        if data and isinstance(data, dict):
+            return data
+    except Exception:
+        pass
+    # 默认初始数据
     return {"cash": 100000.0, "portfolio": {}}
 
 def save_data():
@@ -38,10 +39,10 @@ def save_data():
         "cash": st.session_state.cash,
         "portfolio": st.session_state.portfolio
     }
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
+    # 保存到浏览器 LocalStorage
+    localS.setItem("ai_financial_portfolio", data)
 
-# 初始化模拟炒股账户资产 (从本地文件加载)
+# 初始化模拟炒股账户资产 (从浏览器缓存加载)
 saved_data = load_data()
 if 'cash' not in st.session_state:
     st.session_state.cash = saved_data.get("cash", 100000.0)
@@ -120,7 +121,7 @@ def calculate_risk_metrics(returns_series):
 
 st.title("📈 AI Financial Terminal ")
 
-# 优先从 secrets 读取，若无则使用上方定义的 BUILTIN_API_KEY
+# 优先从 secrets 读取，若无则使用内置 BUILTIN_API_KEY
 try:
     api_key = st.secrets["GROQ_API_KEY"]
 except:
@@ -200,7 +201,7 @@ if app_mode == "📊 Data Analysis":
 
             st.subheader(f"Dashboard: {primary_ticker}")
             if not api_key or api_key == "你的API_KEY填在这里":
-                show_custom_alert("检测到未正确配置 API Key，请修改代码中的 BUILTIN_API_KEY。", "warning")
+                show_custom_alert("检测到未正确配置 API Key，请配置对应的 Key。", "warning")
             else:
                 try:
                     client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
@@ -578,7 +579,7 @@ elif app_mode == "⚔️ Companies Comparison":
 
 请从以下几个维度进行深度剖析：
 1. 【商业模式与护城河对比】：谁的护城河更深？核心壁垒是什么？
-2. 【财务健康与估值优劣】：结合 PE、PB、利润率与增长率，谁的性价比更高？
+2. 【财务健康与估值优劣】：结合 PE, PB, 利润率与增长率，谁的性价比更高？
 3. 【增长潜力与未来催化剂】：谁在未来更有爆发力或更稳健？
 4. 【最终裁决 (Winner)】：明确给出更推荐哪一家，并给出核心理由。
 """

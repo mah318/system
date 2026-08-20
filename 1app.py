@@ -6,7 +6,8 @@ import pandas as pd
 import numpy as np
 import requests
 import concurrent.futures
-import streamlit_localstorage as sl
+import json
+import urllib.parse
 
 st.set_page_config(page_title="AI Financial Terminal", layout="wide")
 
@@ -20,29 +21,30 @@ session.headers.update({
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 })
 
-# 初始化浏览器本地存储组件
-localS = sl.LocalStorage()
-
+# 使用 Streamlit 原生的 query_params 实现零依赖的云端持久化
 def load_data():
     try:
-        # 从浏览器 LocalStorage 读取数据
-        data = localS.getItem("ai_financial_portfolio")
-        if data and isinstance(data, dict):
-            return data
+        encoded_data = st.query_params.get("portfolio_data", None)
+        if encoded_data:
+            decoded_json = urllib.parse.unquote(encoded_data)
+            return json.loads(decoded_json)
     except Exception:
         pass
-    # 默认初始数据
     return {"cash": 100000.0, "portfolio": {}}
 
 def save_data():
-    data = {
-        "cash": st.session_state.cash,
-        "portfolio": st.session_state.portfolio
-    }
-    # 保存到浏览器 LocalStorage
-    localS.setItem("ai_financial_portfolio", data)
+    try:
+        data = {
+            "cash": st.session_state.cash,
+            "portfolio": st.session_state.portfolio
+        }
+        json_str = json.dumps(data, ensure_ascii=False)
+        # 将资产数据实时同步到浏览器 URL 中，服务器重启也不会丢
+        st.query_params["portfolio_data"] = urllib.parse.quote(json_str)
+    except Exception as e:
+        print(f"Save error: {e}")
 
-# 初始化模拟炒股账户资产 (从浏览器缓存加载)
+# 初始化模拟炒股账户资产 (从 URL 缓存加载)
 saved_data = load_data()
 if 'cash' not in st.session_state:
     st.session_state.cash = saved_data.get("cash", 100000.0)

@@ -336,7 +336,7 @@ if app_mode == "📊 Data Analysis":
                 
                 # --- 深度财务健康度 ---
                 st.markdown("---")
-                st.write("**💰 财务健康与现金流 (Deep Fundamentals):**")
+                st.write("**Deep Fundamentals:**")
                 
                 deep_data = get_deep_financials(primary_ticker)
                 

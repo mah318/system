@@ -12,10 +12,9 @@ import urllib.parse
 st.set_page_config(page_title="AI Financial Terminal", layout="wide")
 
 # ==================== 在这里直接内置你的 API Key ====================
-BUILTIN_API_KEY = "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"
+BUILTIN_API_KEY = ""
 # =================================================================-
 
-# 创建全局带 User-Agent 的请求会话
 session = requests.Session()
 session.headers.update({
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -86,15 +85,10 @@ def get_stock_data(ticker, period):
     except Exception:
         return pd.DataFrame()
 
-def extract_val(val, default='N/A'):
-    if isinstance(val, dict):
-        return val.get('raw', default)
-    return val if val is not None else default
-
-# 采用 Yahoo 官方 v10 与 v7 复合接口获取全套基本面数据，根治 N/A 问题
+# 采用 yfinance 原生 .info 属性，彻底根治 N/A 问题
 @st.cache_data(ttl=600)
 def get_stock_info(ticker):
-    info = {
+    info_dict = {
         'marketCap': 'N/A',
         'currentPrice': 'N/A',
         'trailingPE': 'N/A',
@@ -105,60 +99,22 @@ def get_stock_info(ticker):
         'sector': 'Others'
     }
     
-    # 1. 优先通过 v10 quoteSummary 获取深层基本面（PE, PB, 利润率, 营收增长等）
     try:
-        url_v10 = f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{ticker}?modules=defaultKeyStatistics,financialData,summaryDetail,assetProfile"
-        r = session.get(url_v10, timeout=5)
-        data = r.json()
-        res_list = data.get('quoteSummary', {}).get('result', [])
-        if res_list:
-            res = res_list[0]
-            
-            sd = res.get('summaryDetail', {})
-            if sd:
-                info['marketCap'] = extract_val(sd.get('marketCap'), info['marketCap'])
-                info['trailingPE'] = extract_val(sd.get('trailingPE'), info['trailingPE'])
-                info['currentPrice'] = extract_val(sd.get('regularMarketPrice', sd.get('previousClose')), info['currentPrice'])
-
-            stats = res.get('defaultKeyStatistics', {})
-            if stats:
-                if info['trailingPE'] == 'N/A':
-                    info['trailingPE'] = extract_val(stats.get('trailingPE'), 'N/A')
-                info['priceToBook'] = extract_val(stats.get('priceToBook'), 'N/A')
-
-            fin = res.get('financialData', {})
-            if fin:
-                info['profitMargins'] = extract_val(fin.get('profitMargins'), 'N/A')
-                info['revenueGrowth'] = extract_val(fin.get('revenueGrowth'), 'N/A')
-                if info['currentPrice'] == 'N/A':
-                    info['currentPrice'] = extract_val(fin.get('currentPrice'), 'N/A')
-
-            prof = res.get('assetProfile', {})
-            if prof:
-                info['sector'] = prof.get('sector', 'Others')
-                info['shortName'] = res.get('summaryProfile', {}).get('longName', ticker)
+        stock = yf.Ticker(ticker, session=session)
+        inf = stock.info
+        if inf:
+            info_dict['marketCap'] = inf.get('marketCap', 'N/A')
+            info_dict['currentPrice'] = inf.get('currentPrice', inf.get('regularMarketPrice', 'N/A'))
+            info_dict['trailingPE'] = inf.get('trailingPE', 'N/A')
+            info_dict['priceToBook'] = inf.get('priceToBook', 'N/A')
+            info_dict['profitMargins'] = inf.get('profitMargins', 'N/A')
+            info_dict['revenueGrowth'] = inf.get('revenueGrowth', 'N/A')
+            info_dict['shortName'] = inf.get('shortName', inf.get('longName', ticker))
+            info_dict['sector'] = inf.get('sector', 'Others')
     except Exception:
         pass
 
-    # 2. 如果部分指标仍缺失，使用 v7 接口进行补充
-    if info['marketCap'] == 'N/A' or info['trailingPE'] == 'N/A' or info['priceToBook'] == 'N/A':
-        try:
-            url_v7 = f"https://query2.finance.yahoo.com/v7/finance/quote?symbols={ticker}"
-            r = session.get(url_v7, timeout=5)
-            data = r.json()
-            result = data.get('quoteResponse', {}).get('result', [])
-            if result:
-                q = result[0]
-                if info['marketCap'] == 'N/A': info['marketCap'] = q.get('marketCap', 'N/A')
-                if info['currentPrice'] == 'N/A': info['currentPrice'] = q.get('regularMarketPrice', 'N/A')
-                if info['trailingPE'] == 'N/A': info['trailingPE'] = q.get('trailingPE', 'N/A')
-                if info['priceToBook'] == 'N/A': info['priceToBook'] = q.get('priceToBook', 'N/A')
-                if info['sector'] == 'Others': info['sector'] = q.get('sector', 'Others')
-                info['shortName'] = q.get('shortName', ticker)
-        except Exception:
-            pass
-
-    return info
+    return info_dict
 
 @st.cache_data(ttl=600)
 def get_stock_news(ticker):
@@ -224,7 +180,7 @@ if app_mode == "📊 Data Analysis":
             primary_ticker = tickers_input[0]
             df_primary = get_stock_data(primary_ticker, period)
             if df_primary.empty:
-                show_custom_alert(f"未获取到 {primary_ticker} 的行情数据（可能触发了 Yahoo 频率限制，请稍后再试）。", "error")
+                show_custom_alert(f"未获取到 {primary_ticker} 的行情数据。", "error")
                 st.stop()
                 
             info = get_stock_info(primary_ticker)

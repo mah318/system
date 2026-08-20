@@ -373,6 +373,7 @@ if app_mode == "📊 Data Analysis":
                 d_col5.metric("派息比率 (Payout Ratio)", f"{pay*100:.2f}%" if pay else "N/A", 
                               help="显示公司将多少净利润用于派息。过高可能影响增长，过低说明分红意愿不强。")
 
+
                 st.markdown("---")
                 st.write("**🤖 AI Fundamental Evaluation:**")
                 if api_key and api_key != "你的API_KEY填在这里":
@@ -387,6 +388,51 @@ if app_mode == "📊 Data Analysis":
                         show_custom_alert("基本面 AI 评估加载失败。", "error")
                 else:
                     show_custom_alert("请先配置 API Key 以查看 AI 评估。", "warning")
+
+                 # --- 新增：交互式 AI 研究助手 ---
+                st.markdown("---")
+                st.subheader(f"💬 Ask Research Assistant about {primary_ticker}")
+                
+                # 关键：当用户切换股票时，自动清空旧的对话记录
+                if "last_ticker" not in st.session_state: st.session_state.last_ticker = primary_ticker
+                if st.session_state.last_ticker != primary_ticker:
+                    st.session_state.messages = []
+                    st.session_state.last_ticker = primary_ticker
+                
+                if "messages" not in st.session_state: st.session_state.messages = []
+                
+                # 显示聊天记录
+                for message in st.session_state.messages:
+                    with st.chat_message(message["role"]):
+                        st.markdown(message["content"])
+
+                # 处理用户输入
+                if prompt := st.chat_input(f"关于 {primary_ticker}，你想深入了解什么？..."):
+                    st.session_state.messages.append({"role": "user", "content": prompt})
+                    with st.chat_message("user"):
+                        st.markdown(prompt)
+                    
+                    # 获取上下文
+                    context = get_comprehensive_context(primary_ticker)
+                    
+                    # 发送给 AI
+                    full_prompt = f"""你是一名华尔街顶级投研专家。请基于以下上下文数据，回答用户问题。
+                    上下文: {context}
+                    用户问题: {prompt}
+                    """
+                    
+                    with st.chat_message("assistant"):
+                        try:
+                            # 注意：这里确保你已经实例化了 client，或者在上方作用域里能访问到 client
+                            response = client.chat.completions.create(
+                                model=auto_model,
+                                messages=[{"role": "user", "content": full_prompt}]
+                            )
+                            answer = response.choices[0].message.content
+                            st.markdown(answer)
+                            st.session_state.messages.append({"role": "assistant", "content": answer})
+                        except Exception as e:
+                            st.error(f"分析请求失败: {e}")
                     
             with tab2:
                 st.subheader(f"技术指标 : {primary_ticker}")

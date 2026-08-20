@@ -331,42 +331,47 @@ if app_mode == "📊 Data Analysis":
             with tab1:
                 st.subheader(f"Fundamentals Analysis: {primary_ticker}")
                 
-                # --- 基础估值 ---
+                # 1. 基础估值 (保持原有)
                 col1, col2, col3 = st.columns(3)
                 col1.metric("市值 (Market Cap)", market_cap_str)
                 col2.metric("市盈率 (P/E)", pe_str)
                 col3.metric("市净率 (P/B)", pb_str)
                 
-                # --- 深度财务健康度 ---
+                col4, col5 = st.columns(2)
+                col4.metric("利润率 (Profit Margin)", margin_str)
+                col5.metric("营收增长率 (Revenue Growth)", growth_str)
+                
+                # 2. 财务健康深度透视 (新增部分)
                 st.markdown("---")
                 st.subheader("**Deep Fundamentals:**")
                 
                 deep_data = get_deep_financials(primary_ticker)
                 
-                col_d1, col_d2, col_d3 = st.columns(3)
+                # 创建三列布局
+                d_col1, d_col2, d_col3 = st.columns(3)
                 
-                # 债务权益比
+                # D/E 比率
                 de = deep_data.get('debtToEquity')
-                de_display = f"{de:.2f}" if de else "N/A"
-                col_d1.metric("债务/权益比 (D/E)", de_display, help="衡量杠杆率。数值过高可能存在债务风险。")
+                d_col1.metric("债务/权益比 (D/E)", f"{de:.2f}" if isinstance(de, (int, float)) else "N/A", 
+                              help="衡量公司杠杆率。数值过高（如 > 2.0）可能存在较大债务风险。")
                 
                 # 速动比率
                 qr = deep_data.get('quickRatio')
-                qr_display = f"{qr:.2f}" if qr else "N/A"
-                col_d2.metric("速动比率 (Quick Ratio)", qr_display, help="衡量短期偿债能力。通常 > 1 表示资金健康。")
+                d_col2.metric("速动比率 (Quick Ratio)", f"{qr:.2f}" if isinstance(qr, (int, float)) else "N/A", 
+                              help="衡量短期偿债能力。通常 > 1 表示资金链健康，< 1 可能有流动性风险。")
                 
                 # 自由现金流
                 fcf = deep_data.get('freeCashFlow')
-                fcf_display = f"${fcf/1e9:.2f}B" if isinstance(fcf, (int, float)) else "N/A"
-                col_d3.metric("自由现金流 (FCF)", fcf_display, help="公司真正能装进口袋的钱。")
+                fcf_str = f"${fcf/1e9:.2f}B" if isinstance(fcf, (int, float)) else "N/A"
+                d_col3.metric("自由现金流 (FCF)", fcf_str, help="公司账面上真正可自由支配的现金，FCF 为正代表公司有造血能力。")
                 
-                # --- 分红信息 ---
-                col_d4, col_d5 = st.columns(2)
+                # 分红信息
+                d_col4, d_col5 = st.columns(2)
                 div = deep_data.get('dividendYield')
                 pay = deep_data.get('payoutRatio')
-                
-                col_d4.metric("股息率 (Dividend Yield)", f"{div*100:.2f}%" if div else "N/A")
-                col_d5.metric("派息比率 (Payout Ratio)", f"{pay*100:.2f}%" if pay else "N/A", help="判断分红是否可持续。")
+                d_col4.metric("股息率 (Dividend Yield)", f"{div*100:.2f}%" if div else "N/A")
+                d_col5.metric("派息比率 (Payout Ratio)", f"{pay*100:.2f}%" if pay else "N/A", 
+                              help="显示公司将多少净利润用于派息。过高可能影响增长，过低说明分红意愿不强。")
 
                 st.markdown("---")
                 st.write("**🤖 AI Fundamental Evaluation:**")

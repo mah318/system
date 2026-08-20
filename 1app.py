@@ -15,6 +15,11 @@ st.set_page_config(page_title="AI Financial Terminal", layout="wide")
 BUILTIN_API_KEY = "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"
 # ==================================================================
 
+# 创建全局带 User-Agent 的请求会话，防止被 Yahoo Finance 拦截导致获取不到数据
+session = requests.Session()
+session.headers.update({
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+})
 
 # 数据持久化文件路径
 DATA_FILE = "portfolio_data.json"
@@ -64,9 +69,8 @@ def get_ticker_from_name(query):
     if not query:
         return ""
     url = f"https://query2.finance.yahoo.com/v1/finance/search?q={query}"
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
     try:
-        r = requests.get(url, headers=headers, timeout=5)
+        r = session.get(url, timeout=5)
         data = r.json()
         if 'quotes' in data and len(data['quotes']) > 0:
             return data['quotes'][0]['symbol']
@@ -77,7 +81,7 @@ def get_ticker_from_name(query):
 @st.cache_data
 def get_stock_data(ticker, period):
     try:
-        stock = yf.Ticker(ticker)
+        stock = yf.Ticker(ticker, session=session)
         df = stock.history(period=period)
         return df
     except Exception:
@@ -86,7 +90,7 @@ def get_stock_data(ticker, period):
 # 获取股票最新新闻标题
 def get_stock_news(ticker):
     try:
-        stock = yf.Ticker(ticker)
+        stock = yf.Ticker(ticker, session=session)
         news = stock.news
         titles = []
         if news:
@@ -168,7 +172,7 @@ if app_mode == "📊 Data Analysis":
                 show_custom_alert(f"未获取到 {primary_ticker} 的行情数据。", "error")
                 st.stop()
                 
-            stock_primary = yf.Ticker(primary_ticker)
+            stock_primary = yf.Ticker(primary_ticker, session=session)
             info = stock_primary.info
             raw_market_cap = info.get('marketCap', 'N/A')
             raw_pe = info.get('trailingPE', 'N/A')
@@ -317,11 +321,9 @@ if app_mode == "📊 Data Analysis":
                 st.line_chart(df_primary[['RSI']])
                 st.line_chart(df_primary[['MACD', 'Signal']])
                 
-                # 获取该股票的完整 OHLCV 数据
                 df_candle = get_stock_data(primary_ticker, period)
                 
                 if not df_candle.empty:
-                    # 创建 Candlestick 图表
                     fig_candle = go.Figure(data=[go.Candlestick(
                         x=df_candle.index,
                         open=df_candle['Open'],
@@ -331,11 +333,9 @@ if app_mode == "📊 Data Analysis":
                         name='Market Data'
                     )])
 
-                    # 添加成交量 (Volume) 的子图层，看起来更像专业交易软件
-                    # 通过调整 layout 把图表和成交量叠在一起或上下分栏
                     fig_candle.update_layout(
                         template="plotly_dark",
-                        xaxis_rangeslider_visible=False, # 隐藏底部的 range slider 节省空间
+                        xaxis_rangeslider_visible=False,
                         title=f"{primary_ticker} Candlestick Analysis",
                         yaxis_title="Price",
                         height=500
@@ -343,7 +343,6 @@ if app_mode == "📊 Data Analysis":
                     
                     st.plotly_chart(fig_candle, use_container_width=True)
                     
-                    # 额外展示 Moving Average (简单的技术指标示例)
                     df_candle['SMA_20'] = df_candle['Close'].rolling(window=20).mean()
                     st.line_chart(df_candle[['Close', 'SMA_20']])
                 else:
@@ -370,15 +369,13 @@ elif app_mode == "🪙 Trading System":
         try:
             trade_df = get_stock_data(resolved_trade_ticker, "1y")
             if not trade_df.empty and 'Close' in trade_df.columns:
-                # 过滤掉 NaN，取最后一个有效收盘价
                 valid_closes = trade_df['Close'].dropna()
                 if not valid_closes.empty:
                     trade_price = float(valid_closes.iloc[-1])
             
-            # 如果历史数据取出来还是 NaN 或 0，走 info 兜底获取当前价
             if pd.isna(trade_price) or trade_price == 0.0:
                 try:
-                    inf = yf.Ticker(resolved_trade_ticker).info
+                    inf = yf.Ticker(resolved_trade_ticker, session=session).info
                     trade_price = float(inf.get('currentPrice') or inf.get('regularMarketPrice') or inf.get('previousClose') or 0.0)
                 except:
                     pass
@@ -506,7 +503,7 @@ elif app_mode == "🪙 Trading System":
                 cur_p = float(latest_df['Close'].iloc[-1]) if not latest_df.empty else data["avg_price"]
                 market_val = shares * cur_p
                 try:
-                    sector = yf.Ticker(t).info.get('sector', 'Others')
+                    sector = yf.Ticker(t, session=session).info.get('sector', 'Others')
                 except:
                     sector = 'Others'
                 sector_allocation[sector] = sector_allocation.get(sector, 0.0) + market_val
@@ -536,8 +533,8 @@ elif app_mode == "⚔️ Companies Comparison":
         else:
             with st.spinner("正在获取双方财务数据与基本面信息并进行 AI 深度对比..."):
                 try:
-                    info_a = yf.Ticker(resolved_a).info
-                    info_b = yf.Ticker(resolved_b).info
+                    info_a = yf.Ticker(resolved_a, session=session).info
+                    info_b = yf.Ticker(resolved_b, session=session).info
                     
                     data_a = {
                         "Ticker": resolved_a,
@@ -648,7 +645,7 @@ elif app_mode == "🏆 Top 50 Companies":
         def get_single_stock_info(item):
             ticker, name = item
             try:
-                stock = yf.Ticker(ticker)
+                stock = yf.Ticker(ticker, session=session)
                 inf = stock.info
                 price = inf.get('currentPrice') or inf.get('regularMarketPrice') or 0
                 mcap = inf.get('marketCap') or 0
@@ -680,4 +677,3 @@ elif app_mode == "🏆 Top 50 Companies":
         st.dataframe(df_display, use_container_width=True)
     else:
         show_custom_alert("Failed to load data, please check your internet connection.", "error")
-

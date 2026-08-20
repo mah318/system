@@ -9,6 +9,8 @@ import json
 import os
 import concurrent.futures
 
+st.set_page_config(page_title="AI Financial Terminal", layout="wide")
+
 # ==================== 在这里直接内置你的 API Key ====================
 BUILTIN_API_KEY = "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"
 # ==================================================================
@@ -111,7 +113,7 @@ def calculate_risk_metrics(returns_series):
     else:
         sharpe_ratio = float((mean_daily_return / std_daily_return) * np.sqrt(252))
     return max_drawdown, sharpe_ratio
-st.set_page_config(page_title="Financial Terminal", layout="wide")
+
 st.title("📈 AI Financial Terminal ")
 
 # 优先从 secrets 读取，若无则使用上方定义的 BUILTIN_API_KEY
@@ -678,3 +680,4 @@ elif app_mode == "🏆 Top 50 Companies":
         st.dataframe(df_display, use_container_width=True)
     else:
         show_custom_alert("Failed to load data, please check your internet connection.", "error")
+

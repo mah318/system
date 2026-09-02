@@ -376,7 +376,7 @@ if app_mode == "📊 Data Analysis":
 
                 st.markdown("---")
                 st.write("**🤖 AI Fundamental Evaluation:**")
-                if api_key and api_key != "你的API_KEY填在这里":
+                if api_key and api_key != "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":
                     try:
                         fund_prompt = f"基于 {primary_ticker} 的硬性数据（PE: {pe_str}, PB: {pb_str}, 利润率: {margin_str}, 营收增长: {growth_str}），请用数据推导列出5项核心基本面评价。"
                         fund_response = client.chat.completions.create(

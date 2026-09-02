@@ -12,12 +12,12 @@ import urllib.parse
 st.set_page_config(page_title="AI Financial Terminal", layout="wide")
 
 # ==================== 在这里直接内置你的 API Key ====================
-BUILTIN_API_KEY = "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"
+BUILTIN_API_KEY = "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"
 # =================================================================-
 
 session = requests.Session()
 session.headers.update({
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 })
 
 def load_data():

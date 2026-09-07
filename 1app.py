@@ -709,22 +709,47 @@ elif app_mode == "🏆 Top 50 Companies":
     def fetch_market_data(companies_list, currency_sym):
         def get_single_stock_info(item):
             ticker, name = item
+            price = 'N/A'
+            mcap = 'N/A'
             try:
-                inf = get_stock_info(ticker)
-                price = inf.get('currentPrice') if isinstance(inf.get('currentPrice'), (int, float)) else 0
-                mcap = inf.get('marketCap') if isinstance(inf.get('marketCap'), (int, float)) else 0
-                return {
-                    "Ticker": ticker,
-                    "Company": name,
-                    "Price_Display": f"{currency_sym}{price:,.2f}" if price else "N/A",
-                    "Market Cap": f"{mcap:,.0f}" if mcap else "N/A",
-                    "MarketCap_Raw": mcap
-                }
+                stock = yf.Ticker(ticker, session=session)
+                # 1. 优先通过 fast_info 获取最新价与市值
+                try:
+                    fi = stock.fast_info
+                    if fi:
+                        p = getattr(fi, 'last_price', None)
+                        shares = getattr(fi, 'shares', None)
+                        if p:
+                            price = float(p)
+                        if shares and p:
+                            mcap = shares * p
+                except:
+                    pass
+                
+                # 2. 如果拿不到，用历史行情兜底
+                if price == 'N/A':
+                    df = stock.history(period="5d")
+                    if not df.empty and 'Close' in df.columns:
+                        price = float(df['Close'].iloc[-1])
+                        try:
+                            shares = stock.fast_info.get('shares')
+                            if shares:
+                                mcap = shares * price
+                        except:
+                            pass
             except:
-                return {
-                    "Ticker": ticker, "Company": name, 
-                    "Price_Display": "N/A", "Market Cap": "N/A", "MarketCap_Raw": 0
-                }
+                pass
+
+            price_val = price if isinstance(price, (int, float)) else 0
+            mcap_val = mcap if isinstance(mcap, (int, float)) else 0
+
+            return {
+                "Ticker": ticker,
+                "Company": name,
+                "Price_Display": f"{currency_sym}{price_val:,.2f}" if price_val else "N/A",
+                "Market Cap": f"{mcap_val:,.0f}" if mcap_val else "N/A",
+                "MarketCap_Raw": mcap_val
+            }
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
             data_rows = list(executor.map(get_single_stock_info, companies_list))

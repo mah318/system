@@ -88,43 +88,35 @@ def get_stock_data(ticker, period):
 
 # 采用 yfinance 原生 .info 属性，彻底根治 N/A 问题
 @st.cache_data(ttl=600)
-def get_safe_price_and_cap(ticker):
-    """用最稳妥的方式获取最新价和市值，绝不会返回 N/A"""
+def get_stock_info(ticker):
+    info_dict = {
+        'marketCap': 'N/A',
+        'currentPrice': 'N/A',
+        'trailingPE': 'N/A',
+        'priceToBook': 'N/A',
+        'profitMargins': 'N/A',
+        'revenueGrowth': 'N/A',
+        'shortName': ticker,
+        'sector': 'Others'
+    }
+    
     try:
-        stock = yf.Ticker(ticker)
-        price = 'N/A'
-        market_cap = 'N/A'
-        
-        # 1. 优先通过 fast_info 获取
-        try:
-            fi = stock.fast_info
-            if fi:
-                p = getattr(fi, 'last_price', None)
-                shares = getattr(fi, 'shares', None)
-                if p:
-                    price = float(p)
-                if shares and p:
-                    market_cap = shares * p
-        except:
-            pass
-            
-        # 2. 如果 fast_info 拿不到，用历史行情最近一天兜底
-        if price == 'N/A':
-            df = stock.history(period="5d")
-            if not df.empty and 'Close' in df.columns:
-                price = float(df['Close'].iloc[-1])
-                # 如果有股本信息再算市值
-                try:
-                    shares = stock.fast_info.get('shares')
-                    if shares:
-                        market_cap = shares * price
-                except:
-                    pass
-                    
-        return price, market_cap
-    except:
-        return 'N/A', 'N/A'
+        stock = yf.Ticker(ticker, session=session)
+        inf = stock.info
+        if inf:
+            info_dict['marketCap'] = inf.get('marketCap', 'N/A')
+            info_dict['currentPrice'] = inf.get('currentPrice', inf.get('regularMarketPrice', 'N/A'))
+            info_dict['trailingPE'] = inf.get('trailingPE', 'N/A')
+            info_dict['priceToBook'] = inf.get('priceToBook', 'N/A')
+            info_dict['profitMargins'] = inf.get('profitMargins', 'N/A')
+            info_dict['revenueGrowth'] = inf.get('revenueGrowth', 'N/A')
+            info_dict['shortName'] = inf.get('shortName', inf.get('longName', ticker))
+            info_dict['sector'] = inf.get('sector', 'Others')
+    except Exception:
+        pass
 
+    return info_dict
+    
 @st.cache_data(ttl=3600)
 def get_deep_financials(ticker):
     """获取更深入的资产负债表与现金流指标"""

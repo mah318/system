@@ -80,7 +80,8 @@ def get_ticker_from_name(query):
 @st.cache_data(ttl=600)
 def get_stock_data(ticker, period):
     try:
-        stock = yf.Ticker(ticker, session=session)
+        # 移除自定义 session，让 yfinance 自动处理 Cookie 和 Crumb
+        stock = yf.Ticker(ticker)
         df = stock.history(period=period)
         return df
     except Exception:
@@ -100,7 +101,7 @@ def get_stock_info(ticker):
     }
     
     try:
-        stock = yf.Ticker(ticker, session=session)
+        stock = yf.Ticker(ticker) # 移除 session=session
         inf = stock.info
         if inf:
             info_dict['marketCap'] = inf.get('marketCap', 'N/A')
@@ -119,7 +120,7 @@ def get_stock_info(ticker):
 @st.cache_data(ttl=600)
 def get_stock_news(ticker):
     try:
-        stock = yf.Ticker(ticker, session=session)
+        stock = yf.Ticker(ticker) # 移除 session=session
         news = stock.news
         titles = []
         if news:
@@ -133,7 +134,7 @@ def get_stock_news(ticker):
 
 @st.cache_data(ttl=3600)
 def get_deep_financials(ticker):
-    stock = yf.Ticker(ticker, session=session)
+    stock = yf.Ticker(ticker) # 移除 session=session
     info = stock.info
     
     metrics = {

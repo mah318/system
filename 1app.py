@@ -86,7 +86,6 @@ def get_stock_data(ticker, period):
     except Exception:
         return pd.DataFrame()
 
-# 采用 yfinance 原生 .info 属性，彻底根治 N/A 问题
 @st.cache_data(ttl=600)
 def get_stock_info(ticker):
     info_dict = {
@@ -134,11 +133,9 @@ def get_stock_news(ticker):
 
 @st.cache_data(ttl=3600)
 def get_deep_financials(ticker):
-    """获取更深入的资产负债表与现金流指标"""
     stock = yf.Ticker(ticker, session=session)
     info = stock.info
     
-    # 提取核心健康指标，若获取不到则返回 None
     metrics = {
         'debtToEquity': info.get('debtToEquity'),
         'quickRatio': info.get('quickRatio'),
@@ -147,11 +144,9 @@ def get_deep_financials(ticker):
         'freeCashFlow': 'N/A'
     }
     
-    # 尝试提取自由现金流
     try:
         cf = stock.cashflow
         if cf is not None and not cf.empty:
-            # 兼容不同结构的财报字段查找
             if 'Free Cash Flow' in cf.index:
                 metrics['freeCashFlow'] = cf.loc['Free Cash Flow'].iloc[0]
             elif 'FreeCashFlow' in cf.index:
@@ -160,6 +155,28 @@ def get_deep_financials(ticker):
         pass
         
     return metrics
+
+def get_comprehensive_context(ticker):
+    info = get_stock_info(ticker)
+    news = get_stock_news(ticker)
+    deep = get_deep_financials(ticker)
+    context = f"""
+    Ticker: {ticker}
+    Name: {info.get('shortName')}
+    Sector: {info.get('sector')}
+    Market Cap: {info.get('marketCap')}
+    Current Price: {info.get('currentPrice')}
+    Trailing P/E: {info.get('trailingPE')}
+    Price to Book: {info.get('priceToBook')}
+    Profit Margins: {info.get('profitMargins')}
+    Revenue Growth: {info.get('revenueGrowth')}
+    Debt to Equity: {deep.get('debtToEquity')}
+    Quick Ratio: {deep.get('quickRatio')}
+    Dividend Yield: {deep.get('dividendYield')}
+    Free Cash Flow: {deep.get('freeCashFlow')}
+    Recent News Headlines: {", ".join(news)}
+    """
+    return context
 
 st.title("📈 AI Financial Terminal ")
 
@@ -248,9 +265,9 @@ if app_mode == "📊 Data Analysis":
                     models_response = client.models.list()
                     available_models = [m.id for m in models_response.data]
                     
-                    auto_model = available_models[0] if available_models else "openai/gpt-oss-120b"
+                    auto_model = available_models[0] if available_models else "llama-3.3-70b-versatile"
                     for m in available_models:
-                        if any(k in m.lower() for k in ['chat', 'versatile', 'instant', '8b', '70b', 'gpt-oss', 'instruct']):
+                        if any(k in m.lower() for k in ['chat', 'versatile', 'instant', '8b', '70b', 'instruct']):
                             auto_model = m
                             break
 
@@ -332,7 +349,6 @@ if app_mode == "📊 Data Analysis":
             with tab1:
                 st.subheader(f"Fundamentals Analysis: {primary_ticker}")
                 
-                # 1. 基础估值 (保持原有)
                 col1, col2, col3 = st.columns(3)
                 col1.metric("市值 (Market Cap)", market_cap_str)
                 col2.metric("市盈率 (P/E)", pe_str)
@@ -342,31 +358,25 @@ if app_mode == "📊 Data Analysis":
                 col4.metric("利润率 (Profit Margin)", margin_str)
                 col5.metric("营收增长率 (Revenue Growth)", growth_str)
                 
-                # 2. 财务健康深度透视 (新增部分)
                 st.markdown("---")
                 st.subheader("**Deep Fundamentals:**")
                 
                 deep_data = get_deep_financials(primary_ticker)
                 
-                # 创建三列布局
                 d_col1, d_col2, d_col3 = st.columns(3)
                 
-                # D/E 比率
                 de = deep_data.get('debtToEquity')
                 d_col1.metric("债务/权益比 (D/E)", f"{de:.2f}" if isinstance(de, (int, float)) else "N/A", 
                               help="衡量公司杠杆率。数值过高（如 > 2.0）可能存在较大债务风险。")
                 
-                # 速动比率
                 qr = deep_data.get('quickRatio')
                 d_col2.metric("速动比率 (Quick Ratio)", f"{qr:.2f}" if isinstance(qr, (int, float)) else "N/A", 
                               help="衡量短期偿债能力。通常 > 1 表示资金链健康，< 1 可能有流动性风险。")
                 
-                # 自由现金流
                 fcf = deep_data.get('freeCashFlow')
                 fcf_str = f"${fcf/1e9:.2f}B" if isinstance(fcf, (int, float)) else "N/A"
                 d_col3.metric("自由现金流 (FCF)", fcf_str, help="公司账面上真正可自由支配的现金，FCF 为正代表公司有造血能力。")
                 
-                # 分红信息
                 d_col4, d_col5 = st.columns(2)
                 div = deep_data.get('dividendYield')
                 pay = deep_data.get('payoutRatio')
@@ -374,10 +384,9 @@ if app_mode == "📊 Data Analysis":
                 d_col5.metric("派息比率 (Payout Ratio)", f"{pay*100:.2f}%" if pay else "N/A", 
                               help="显示公司将多少净利润用于派息。过高可能影响增长，过低说明分红意愿不强。")
 
-
                 st.markdown("---")
                 st.write("**🤖 AI Fundamental Evaluation:**")
-                if api_key and api_key != "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":
+                if api_key and api_key != "你的API_KEY填在这里":
                     try:
                         fund_prompt = f"基于 {primary_ticker} 的硬性数据（PE: {pe_str}, PB: {pb_str}, 利润率: {margin_str}, 营收增长: {growth_str}），请用数据推导列出5项核心基本面评价。"
                         fund_response = client.chat.completions.create(
@@ -390,11 +399,9 @@ if app_mode == "📊 Data Analysis":
                 else:
                     show_custom_alert("请先配置 API Key 以查看 AI 评估。", "warning")
 
-                 # --- 新增：交互式 AI 研究助手 ---
                 st.markdown("---")
                 st.subheader(f"💬 Ask Research Assistant about {primary_ticker}")
                 
-                # 关键：当用户切换股票时，自动清空旧的对话记录
                 if "last_ticker" not in st.session_state: st.session_state.last_ticker = primary_ticker
                 if st.session_state.last_ticker != primary_ticker:
                     st.session_state.messages = []
@@ -402,21 +409,17 @@ if app_mode == "📊 Data Analysis":
                 
                 if "messages" not in st.session_state: st.session_state.messages = []
                 
-                # 显示聊天记录
                 for message in st.session_state.messages:
                     with st.chat_message(message["role"]):
                         st.markdown(message["content"])
 
-                # 处理用户输入
                 if prompt := st.chat_input(f"关于 {primary_ticker}，你想深入了解什么？..."):
                     st.session_state.messages.append({"role": "user", "content": prompt})
                     with st.chat_message("user"):
                         st.markdown(prompt)
                     
-                    # 获取上下文
                     context = get_comprehensive_context(primary_ticker)
                     
-                    # 发送给 AI
                     full_prompt = f"""你是一名华尔街顶级投研专家。请基于以下上下文数据，回答用户问题。
                     上下文: {context}
                     用户问题: {prompt}
@@ -424,7 +427,6 @@ if app_mode == "📊 Data Analysis":
                     
                     with st.chat_message("assistant"):
                         try:
-                            # 注意：这里确保你已经实例化了 client，或者在上方作用域里能访问到 client
                             response = client.chat.completions.create(
                                 model=auto_model,
                                 messages=[{"role": "user", "content": full_prompt}]
@@ -434,7 +436,7 @@ if app_mode == "📊 Data Analysis":
                             st.session_state.messages.append({"role": "assistant", "content": answer})
                         except Exception as e:
                             st.error(f"分析请求失败: {e}")
-                    
+            
             with tab2:
                 st.subheader(f"技术指标 : {primary_ticker}")
                 st.line_chart(df_primary[['RSI']])
@@ -700,7 +702,7 @@ elif app_mode == "⚔️ Companies Comparison":
 4. 【最终裁决 (Winner)】: 明确给出更推荐哪一家，并给出核心理由。
 """
                     pk_response = client.chat.completions.create(
-                        model="openai/gpt-oss-120b",
+                        model="llama-3.3-70b-versatile",
                         messages=[{"role": "user", "content": pk_prompt}]
                     )
                     st.markdown(f"""

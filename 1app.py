@@ -101,103 +101,49 @@ def get_stock_info(ticker):
     }
     
     try:
-        stock = yf.Ticker(ticker)
-        
-        # 1. 优先尝试从 fast_info 获取基础价格和市值（抗封锁能力更强）
-        try:
-            fi = stock.fast_info
-            if fi:
-                cur_p = getattr(fi, 'last_price', None)
-                shares = getattr(fi, 'shares', None)
-                if cur_p:
-                    info_dict['currentPrice'] = cur_p
-                if shares and cur_p:
-                    info_dict['marketCap'] = shares * cur_p
-        except:
-            pass
-
-        # 2. 尝试获取 stock.info
+        stock = yf.Ticker(ticker) # 移除 session=session
         inf = stock.info
-        if inf and isinstance(inf, dict) and len(inf) > 5:
-            info_dict['marketCap'] = inf.get('marketCap', info_dict['marketCap'])
-            info_dict['currentPrice'] = inf.get('currentPrice', inf.get('regularMarketPrice', info_dict['currentPrice']))
+        if inf:
+            info_dict['marketCap'] = inf.get('marketCap', 'N/A')
+            info_dict['currentPrice'] = inf.get('currentPrice', inf.get('regularMarketPrice', 'N/A'))
             info_dict['trailingPE'] = inf.get('trailingPE', 'N/A')
             info_dict['priceToBook'] = inf.get('priceToBook', 'N/A')
             info_dict['profitMargins'] = inf.get('profitMargins', 'N/A')
             info_dict['revenueGrowth'] = inf.get('revenueGrowth', 'N/A')
             info_dict['shortName'] = inf.get('shortName', inf.get('longName', ticker))
             info_dict['sector'] = inf.get('sector', 'Others')
-        else:
-            # 如果 stock.info 失效，尝试通过财报估算部分指标
-            fin = stock.financials
-            if fin is not None and not fin.empty:
-                try:
-                    net_income = fin.loc['Net Income'].iloc[0] if 'Net Income' in fin.index else None
-                    if net_income and isinstance(info_dict['marketCap'], (int, float)):
-                        eps = net_income / shares if 'shares' in locals() and shares else None
-                        if eps and eps > 0 and info_dict['currentPrice'] != 'N/A':
-                            info_dict['trailingPE'] = info_dict['currentPrice'] / eps
-                except:
-                    pass
-    except Exception as e:
-        print(f"Info fetch error: {e}")
+    except Exception:
+        pass
 
     return info_dict
 
+@st.cache_data(ttl=600)
+def get_stock_news(ticker):
+    try:
+        stock = yf.Ticker(ticker) # 移除 session=session
+        news = stock.news
+        titles = []
+        if news:
+            for item in news:
+                title = item.get('title') or item.get('content', {}).get('title')
+                if title:
+                    titles.append(title)
+        return titles[:5]
+    except:
+        return []
+
 @st.cache_data(ttl=3600)
 def get_deep_financials(ticker):
-    stock = yf.Ticker(ticker)
+    stock = yf.Ticker(ticker) # 移除 session=session
+    info = stock.info
     
     metrics = {
-        'debtToEquity': 'N/A',
-        'quickRatio': 'N/A',
-        'dividendYield': 'N/A',
-        'payoutRatio': 'N/A',
+        'debtToEquity': info.get('debtToEquity'),
+        'quickRatio': info.get('quickRatio'),
+        'dividendYield': info.get('dividendYield'),
+        'payoutRatio': info.get('payoutRatio'),
         'freeCashFlow': 'N/A'
     }
-    
-    try:
-        inf = stock.info
-        if inf and isinstance(inf, dict) and len(inf) > 5:
-            metrics['debtToEquity'] = inf.get('debtToEquity', 'N/A')
-            metrics['quickRatio'] = inf.get('quickRatio', 'N/A')
-            metrics['dividendYield'] = inf.get('dividendYield', 'N/A')
-            metrics['payoutRatio'] = inf.get('payoutRatio', 'N/A')
-    except:
-        pass
-
-    # 资产负债表兜底计算：如果 info 拿不到债务/权益比或速动比率，直接从 Balance Sheet 计算
-    try:
-        bs = stock.balance_sheet
-        if bs is not None and not bs.empty:
-            # 寻找总负债和总股东权益
-            total_debt = None
-            total_equity = None
-            current_assets = None
-            current_liabilities = None
-            inventory = None
-            
-            for col in bs.index:
-                col_lower = str(col).lower()
-                if 'total debt' in col_lower or 'long term debt' in col_lower:
-                    total_debt = bs.loc[col].iloc[0]
-                if 'stockholders equity' in col_lower or 'common stock equity' in col_lower:
-                    total_equity = bs.loc[col].iloc[0]
-                if 'current assets' in col_lower:
-                    current_assets = bs.loc[col].iloc[0]
-                if 'current liabilities' in col_lower:
-                    current_liabilities = bs.loc[col].iloc[0]
-                if 'inventory' in col_lower:
-                    inventory = bs.loc[col].iloc[0]
-            
-            if metrics['debtToEquity'] == 'N/A' and total_debt and total_equity and total_equity > 0:
-                metrics['debtToEquity'] = float(total_debt / total_equity * 100)
-                
-            if metrics['quickRatio'] == 'N/A' and current_assets and current_liabilities and current_liabilities > 0:
-                inv = inventory if inventory else 0
-                metrics['quickRatio'] = float((current_assets - inv) / current_liabilities)
-    except:
-        pass
     
     try:
         cf = stock.cashflow

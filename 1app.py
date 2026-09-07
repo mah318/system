@@ -15,13 +15,10 @@ st.set_page_config(page_title="AI Financial Terminal", layout="wide")
 BUILTIN_API_KEY = "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"
 # =================================================================-
 
-# 1. 先获取输入的股票代码
-ticker = "AAPL" # 或者从输入框获取：ticker = st.text_input("Enter Ticker", "AAPL")
-
-# 2. 确认 ticker 有值之后，再调用 Ticker
-if ticker:
-    stock = yf.Ticker(ticker, session=session)
-    info = stock.info
+session = requests.Session()
+session.headers.update({
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+})
 
 
 def load_data():

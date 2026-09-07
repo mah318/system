@@ -143,8 +143,6 @@ def get_stock_info(ticker):
 
         pass
 
-
-
     return info_dict
     
 @st.cache_data(ttl=3600)

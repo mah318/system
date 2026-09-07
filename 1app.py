@@ -86,23 +86,66 @@ def get_stock_data(ticker, period):
     except Exception:
         return pd.DataFrame()
 
+
+# 采用 yfinance 原生 .info 属性，彻底根治 N/A 问题
+
 @st.cache_data(ttl=600)
+
 def get_stock_info(ticker):
-    # 兼容旧代码，防止报错
-    info = {}
+
+    info_dict = {
+
+        'marketCap': 'N/A',
+
+        'currentPrice': 'N/A',
+
+        'trailingPE': 'N/A',
+
+        'priceToBook': 'N/A',
+
+        'profitMargins': 'N/A',
+
+        'revenueGrowth': 'N/A',
+
+        'shortName': ticker,
+
+        'sector': 'Others'
+
+    }
+
+    
+
     try:
+
         stock = yf.Ticker(ticker, session=session)
-        fi = stock.fast_info
-        if fi:
-            price = getattr(fi, 'last_price', None)
-            shares = getattr(fi, 'shares', None)
-            if price:
-                info['currentPrice'] = price
-            if shares and price:
-                info['marketCap'] = shares * price
-    except:
+
+        inf = stock.info
+
+        if inf:
+
+            info_dict['marketCap'] = inf.get('marketCap', 'N/A')
+
+            info_dict['currentPrice'] = inf.get('currentPrice', inf.get('regularMarketPrice', 'N/A'))
+
+            info_dict['trailingPE'] = inf.get('trailingPE', 'N/A')
+
+            info_dict['priceToBook'] = inf.get('priceToBook', 'N/A')
+
+            info_dict['profitMargins'] = inf.get('profitMargins', 'N/A')
+
+            info_dict['revenueGrowth'] = inf.get('revenueGrowth', 'N/A')
+
+            info_dict['shortName'] = inf.get('shortName', inf.get('longName', ticker))
+
+            info_dict['sector'] = inf.get('sector', 'Others')
+
+    except Exception:
+
         pass
-    return info
+
+
+
+    return info_dict
     
 @st.cache_data(ttl=3600)
 def  get_deep_financials(ticker):

@@ -124,7 +124,7 @@ def get_stock_fundamentals(ticker):
     return market_cap, pe_ratio, pb_ratio
     
 @st.cache_data(ttl=3600)
-def get_deep_financials(ticker):
+def get_stock_info(ticker):
     """获取更深入的资产负债表与现金流指标"""
     stock = yf.Ticker(ticker, session=session)
     info = stock.info

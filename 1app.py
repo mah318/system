@@ -76,33 +76,6 @@ def get_ticker_from_name(query):
         pass
     return query.upper()
 
-@st.cache_data(ttl=3600)
-def get_deep_financials(ticker):
-    """获取更深入的资产负债表与现金流指标"""
-    stock = yf.Ticker(ticker, session=session)
-    info = stock.info
-    
-    # 基础指标，如果不存在则赋为 None
-    metrics = {
-        'debtToEquity': info.get('debtToEquity'),
-        'quickRatio': info.get('quickRatio'),
-        'dividendYield': info.get('dividendYield'),
-        'payoutRatio': info.get('payoutRatio'),
-        'freeCashFlow': 'N/A'
-    }
-    
-    # 尝试从财报数据中计算自由现金流 (FCF)
-    try:
-        cf = stock.cashflow
-        if cf is not None and not cf.empty:
-            # 自由现金流 = 经营现金流 - 资本开支
-            operating_cf = cf.loc['Free Cash Flow'].iloc[0] if 'Free Cash Flow' in cf.index else None
-            if operating_cf:
-                metrics['freeCashFlow'] = operating_cf
-    except:
-        pass
-        
-    return metrics
 
 @st.cache_data(ttl=600)
 def get_stock_data(ticker, period):
@@ -158,6 +131,34 @@ def get_stock_news(ticker):
         return titles[:5]
     except:
         return []
+
+@st.cache_data(ttl=3600)
+def get_deep_financials(ticker):
+    """获取更深入的资产负债表与现金流指标"""
+    stock = yf.Ticker(ticker, session=session)
+    info = stock.info
+    
+    # 基础指标，如果不存在则赋为 None
+    metrics = {
+        'debtToEquity': info.get('debtToEquity'),
+        'quickRatio': info.get('quickRatio'),
+        'dividendYield': info.get('dividendYield'),
+        'payoutRatio': info.get('payoutRatio'),
+        'freeCashFlow': 'N/A'
+    }
+    
+    # 尝试从财报数据中计算自由现金流 (FCF)
+    try:
+        cf = stock.cashflow
+        if cf is not None and not cf.empty:
+            # 自由现金流 = 经营现金流 - 资本开支
+            operating_cf = cf.loc['Free Cash Flow'].iloc[0] if 'Free Cash Flow' in cf.index else None
+            if operating_cf:
+                metrics['freeCashFlow'] = operating_cf
+    except:
+        pass
+        
+    return metrics
 
 st.title("📈 AI Financial Terminal ")
 

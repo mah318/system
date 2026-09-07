@@ -5,7 +5,6 @@ from openai import OpenAI
 import pandas as pd
 import numpy as np
 import requests
-import concurrent.futures
 import json
 import urllib.parse
 
@@ -19,7 +18,6 @@ session = requests.Session()
 session.headers.update({
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 })
-
 
 def load_data():
     try:
@@ -80,7 +78,6 @@ def get_ticker_from_name(query):
 @st.cache_data(ttl=600)
 def get_stock_data(ticker, period):
     try:
-        # 移除自定义 session，让 yfinance 自动处理 Cookie 和 Crumb
         stock = yf.Ticker(ticker)
         df = stock.history(period=period)
         return df
@@ -101,11 +98,31 @@ def get_stock_info(ticker):
     }
     
     try:
-        stock = yf.Ticker(ticker) # 移除 session=session
+        stock = yf.Ticker(ticker)
+        
+        # 1. 从行情历史获取最新价格作为最稳健的兜底
+        hist = stock.history(period="5d")
+        if not hist.empty and 'Close' in hist.columns:
+            info_dict['currentPrice'] = float(hist['Close'].iloc[-1])
+
+        # 2. 尝试从 fast_info 获取市值与价格
+        try:
+            fi = stock.fast_info
+            if fi:
+                p = fi.get('last_price') if hasattr(fi, 'get') else getattr(fi, 'last_price', None)
+                if p:
+                    info_dict['currentPrice'] = float(p)
+                shares = fi.get('shares') if hasattr(fi, 'get') else getattr(fi, 'shares', None)
+                if shares and isinstance(info_dict['currentPrice'], (int, float)):
+                    info_dict['marketCap'] = shares * info_dict['currentPrice']
+        except Exception:
+            pass
+
+        # 3. 尝试从 stock.info 获取详细数据
         inf = stock.info
-        if inf:
-            info_dict['marketCap'] = inf.get('marketCap', 'N/A')
-            info_dict['currentPrice'] = inf.get('currentPrice', inf.get('regularMarketPrice', 'N/A'))
+        if isinstance(inf, dict) and len(inf) > 3:
+            info_dict['marketCap'] = inf.get('marketCap', info_dict['marketCap'])
+            info_dict['currentPrice'] = inf.get('currentPrice', info_dict['currentPrice'])
             info_dict['trailingPE'] = inf.get('trailingPE', 'N/A')
             info_dict['priceToBook'] = inf.get('priceToBook', 'N/A')
             info_dict['profitMargins'] = inf.get('profitMargins', 'N/A')
@@ -120,7 +137,7 @@ def get_stock_info(ticker):
 @st.cache_data(ttl=600)
 def get_stock_news(ticker):
     try:
-        stock = yf.Ticker(ticker) # 移除 session=session
+        stock = yf.Ticker(ticker)
         news = stock.news
         titles = []
         if news:
@@ -134,17 +151,26 @@ def get_stock_news(ticker):
 
 @st.cache_data(ttl=3600)
 def get_deep_financials(ticker):
-    stock = yf.Ticker(ticker) # 移除 session=session
-    info = stock.info
+    stock = yf.Ticker(ticker)
     
     metrics = {
-        'debtToEquity': info.get('debtToEquity'),
-        'quickRatio': info.get('quickRatio'),
-        'dividendYield': info.get('dividendYield'),
-        'payoutRatio': info.get('payoutRatio'),
+        'debtToEquity': 'N/A',
+        'quickRatio': 'N/A',
+        'dividendYield': 'N/A',
+        'payoutRatio': 'N/A',
         'freeCashFlow': 'N/A'
     }
     
+    try:
+        inf = stock.info
+        if isinstance(inf, dict) and len(inf) > 3:
+            metrics['debtToEquity'] = inf.get('debtToEquity', 'N/A')
+            metrics['quickRatio'] = inf.get('quickRatio', 'N/A')
+            metrics['dividendYield'] = inf.get('dividendYield', 'N/A')
+            metrics['payoutRatio'] = inf.get('payoutRatio', 'N/A')
+    except:
+        pass
+
     try:
         cf = stock.cashflow
         if cf is not None and not cf.empty:
@@ -238,7 +264,7 @@ if app_mode == "📊 Data Analysis":
             raw_margin = info.get('profitMargins', 'N/A')
             raw_growth = info.get('revenueGrowth', 'N/A')
             
-            market_cap_str = f"{raw_market_cap:,}" if isinstance(raw_market_cap, (int, float)) else str(raw_market_cap)
+            market_cap_str = f"{raw_market_cap:,.0f}" if isinstance(raw_market_cap, (int, float)) else str(raw_market_cap)
             pe_str = f"{raw_pe:.2f}" if isinstance(raw_pe, (int, float)) else str(raw_pe)
             pb_str = f"{raw_pb:.2f}" if isinstance(raw_pb, (int, float)) else str(raw_pb)
             margin_str = f"{raw_margin * 100:.2f}%" if isinstance(raw_margin, (int, float)) else "N/A"
@@ -367,38 +393,20 @@ if app_mode == "📊 Data Analysis":
                 d_col1, d_col2, d_col3 = st.columns(3)
                 
                 de = deep_data.get('debtToEquity')
-                d_col1.metric("债务/权益比 (D/E)", f"{de:.2f}" if isinstance(de, (int, float)) else "N/A", 
-                              help="衡量公司杠杆率。数值过高（如 > 2.0）可能存在较大债务风险。")
+                d_col1.metric("债务/权益比 (D/E)", f"{de:.2f}" if isinstance(de, (int, float)) else "N/A")
                 
                 qr = deep_data.get('quickRatio')
-                d_col2.metric("速动比率 (Quick Ratio)", f"{qr:.2f}" if isinstance(qr, (int, float)) else "N/A", 
-                              help="衡量短期偿债能力。通常 > 1 表示资金链健康，< 1 可能有流动性风险。")
+                d_col2.metric("速动比率 (Quick Ratio)", f"{qr:.2f}" if isinstance(qr, (int, float)) else "N/A")
                 
                 fcf = deep_data.get('freeCashFlow')
                 fcf_str = f"${fcf/1e9:.2f}B" if isinstance(fcf, (int, float)) else "N/A"
-                d_col3.metric("自由现金流 (FCF)", fcf_str, help="公司账面上真正可自由支配的现金，FCF 为正代表公司有造血能力。")
+                d_col3.metric("自由现金流 (FCF)", fcf_str)
                 
                 d_col4, d_col5 = st.columns(2)
                 div = deep_data.get('dividendYield')
                 pay = deep_data.get('payoutRatio')
-                d_col4.metric("股息率 (Dividend Yield)", f"{div*100:.2f}%" if div else "N/A")
-                d_col5.metric("派息比率 (Payout Ratio)", f"{pay*100:.2f}%" if pay else "N/A", 
-                              help="显示公司将多少净利润用于派息。过高可能影响增长，过低说明分红意愿不强。")
-
-                st.markdown("---")
-                st.write("**🤖 AI Fundamental Evaluation:**")
-                if api_key and api_key != "你的API_KEY填在这里":
-                    try:
-                        fund_prompt = f"基于 {primary_ticker} 的硬性数据（PE: {pe_str}, PB: {pb_str}, 利润率: {margin_str}, 营收增长: {growth_str}），请用数据推导列出5项核心基本面评价。"
-                        fund_response = client.chat.completions.create(
-                            model=auto_model,
-                            messages=[{"role": "user", "content": fund_prompt}]
-                        )
-                        st.write(fund_response.choices[0].message.content)
-                    except:
-                        show_custom_alert("基本面 AI 评估加载失败。", "error")
-                else:
-                    show_custom_alert("请先配置 API Key 以查看 AI 评估。", "warning")
+                d_col4.metric("股息率 (Dividend Yield)", f"{div*100:.2f}%" if isinstance(div, (int, float)) else "N/A")
+                d_col5.metric("派息比率 (Payout Ratio)", f"{pay*100:.2f}%" if isinstance(pay, (int, float)) else "N/A")
 
                 st.markdown("---")
                 st.subheader(f"💬 Ask Research Assistant about {primary_ticker}")
@@ -420,7 +428,6 @@ if app_mode == "📊 Data Analysis":
                         st.markdown(prompt)
                     
                     context = get_comprehensive_context(primary_ticker)
-                    
                     full_prompt = f"""你是一名华尔街顶级投研专家。请基于以下上下文数据，回答用户问题。
                     上下文: {context}
                     用户问题: {prompt}
@@ -444,7 +451,6 @@ if app_mode == "📊 Data Analysis":
                 st.line_chart(df_primary[['MACD', 'Signal']])
                 
                 df_candle = get_stock_data(primary_ticker, period)
-                
                 if not df_candle.empty:
                     fig_candle = go.Figure(data=[go.Candlestick(
                         x=df_candle.index,
@@ -454,21 +460,8 @@ if app_mode == "📊 Data Analysis":
                         close=df_candle['Close'],
                         name='Market Data'
                     )])
-
-                    fig_candle.update_layout(
-                        template="plotly_dark",
-                        xaxis_rangeslider_visible=False,
-                        title=f"{primary_ticker} Candlestick Analysis",
-                        yaxis_title="Price",
-                        height=500
-                    )
-                    
+                    fig_candle.update_layout(template="plotly_dark", xaxis_rangeslider_visible=False, title=f"{primary_ticker} Candlestick Analysis", height=500)
                     st.plotly_chart(fig_candle, use_container_width=True)
-                    
-                    df_candle['SMA_20'] = df_candle['Close'].rolling(window=20).mean()
-                    st.line_chart(df_candle[['Close', 'SMA_20']])
-                else:
-                    st.warning("No technical data available.")
 
             with tab3:
                 st.subheader(f"{primary_ticker} 原始数据预览")
@@ -479,46 +472,27 @@ if app_mode == "📊 Data Analysis":
 
 elif app_mode == "🪙 Trading System":
     st.subheader("🪙 Trading")
-    
     col_tinput, col_tinfo = st.columns([2, 3])
     with col_tinput:
         trade_query = st.text_input("Enter the stock code/name:", "AAPL", key="independent_trade_ticker")
         resolved_trade_ticker = get_ticker_from_name(trade_query)
     
     trade_price = 0.0
-    trade_returns = pd.Series(dtype=float)
     if resolved_trade_ticker:
         try:
             trade_df = get_stock_data(resolved_trade_ticker, "1y")
             if not trade_df.empty and 'Close' in trade_df.columns:
-                valid_closes = trade_df['Close'].dropna()
-                if not valid_closes.empty:
-                    trade_price = float(valid_closes.iloc[-1])
-            
-            if pd.isna(trade_price) or trade_price == 0.0:
-                try:
-                    inf = get_stock_info(resolved_trade_ticker)
-                    trade_price = float(inf.get('currentPrice') or 0.0)
-                except:
-                    pass
-
-            if not trade_df.empty:
-                trade_returns = trade_df['Close'].pct_change().dropna()
-
+                trade_price = float(trade_df['Close'].iloc[-1])
             with col_tinfo:
-                price_display = f"${trade_price:.2f}" if not pd.isna(trade_price) and trade_price > 0 else "N/A"
                 st.markdown(f"""
                 <div style="background-color: #1a1a1a; padding: 10px 15px; border-radius: 6px; border: 1px solid #333333; color: #f0f0f0; margin-top: 24px;">
-                    <b>{resolved_trade_ticker}</b> | Latest Prices: <b style="color: #4CAF50;">{price_display}</b>
+                    <b>{resolved_trade_ticker}</b> | Latest Prices: <b style="color: #4CAF50;">${trade_price:.2f}</b>
                 </div>
                 """, unsafe_allow_html=True)
-            if trade_df.empty:
-                show_custom_alert("未找到该股票的行情数据，请检查输入。", "warning")
-        except Exception as e:
-            show_custom_alert(f"获取行情失败: {e}", "warning")
+        except:
+            pass
 
     st.markdown("---")
-
     total_stock_value = 0.0
     portfolio_details = []
     
@@ -533,19 +507,15 @@ elif app_mode == "🪙 Trading System":
         total_stock_value += market_val
         
         portfolio_details.append({
-            "股票代码": t,
-            "持仓数量": shares,
-            "平均成本": f"${avg_price:.2f}",
-            "当前价格": f"${cur_p:.2f}",
-            "市值": f"${market_val:.2f}",
-            "浮动盈亏": f"${pnl:.2f} ({pnl_pct:.2f}%)"
+            "股票代码": t, "持仓数量": shares, "平均成本": f"${avg_price:.2f}",
+            "当前价格": f"${cur_p:.2f}", "市值": f"${market_val:.2f}", "浮动盈亏": f"${pnl:.2f} ({pnl_pct:.2f}%)"
         })
 
     total_assets = st.session_state.cash + total_stock_value
     total_profit = total_assets - 100000.0
     total_profit_pct = (total_profit / 100000.0) * 100
 
-    mcol1, mcol2, mcol3, mcol4, mcol5, mcol6 = st.columns(6)
+    mcol1, mcol2, mcol3, mcol4, _ , _ = st.columns(6)
     mcol1.metric("账户总资产", f"${total_assets:,.2f}", f"{total_profit_pct:+.2f}%")
     mcol2.metric("可用现金", f"${st.session_state.cash:,.2f}")
     mcol3.metric("持仓市值", f"${total_stock_value:,.2f}")
@@ -553,7 +523,6 @@ elif app_mode == "🪙 Trading System":
     st.markdown("---")
     
     col_buy, col_sell = st.columns(2)
-    
     with col_buy:
         st.markdown(f"#### 🟢 Buy: `{resolved_trade_ticker}`")
         buy_shares = st.number_input("买入股数", min_value=1, value=10, step=1, key="ind_buy_shares")
@@ -572,7 +541,6 @@ elif app_mode == "🪙 Trading System":
                     st.session_state.portfolio[resolved_trade_ticker] = {"shares": new_shares, "avg_price": new_avg}
                 else:
                     st.session_state.portfolio[resolved_trade_ticker] = {"shares": buy_shares, "avg_price": trade_price}
-                
                 save_data()
                 show_custom_alert(f"成功买入 {buy_shares} 股 {resolved_trade_ticker}！", "success")
                 st.rerun()
@@ -583,12 +551,7 @@ elif app_mode == "🪙 Trading System":
         st.markdown(f"#### 🔴 Sell: `{resolved_trade_ticker}`")
         owned_shares = st.session_state.portfolio.get(resolved_trade_ticker, {}).get("shares", 0)
         st.write(f"当前持有该股票数量: **{owned_shares} 股**")
-        
-        if owned_shares > 0:
-            sell_shares = st.number_input("卖出股数", min_value=1, max_value=owned_shares, value=1, step=1, key="ind_sell_shares")
-        else:
-            sell_shares = st.number_input("卖出股数", min_value=0, max_value=0, value=0, step=1, disabled=True, key="ind_sell_shares_disabled")
-        
+        sell_shares = st.number_input("卖出股数", min_value=1, max_value=max(1, owned_shares), value=1, step=1, key="ind_sell_shares") if owned_shares > 0 else 0
         if st.button("Confirm Sell", key="btn_ind_sell"):
             if owned_shares >= sell_shares > 0 and trade_price > 0:
                 earned_cash = sell_shares * trade_price
@@ -597,48 +560,19 @@ elif app_mode == "🪙 Trading System":
                     del st.session_state.portfolio[resolved_trade_ticker]
                 else:
                     st.session_state.portfolio[resolved_trade_ticker]["shares"] -= sell_shares
-                
                 save_data()
-                show_custom_alert(f"成功卖出 {sell_shares} 股 {resolved_trade_ticker}，获得现金 ${earned_cash:,.2f}！", "success")
+                show_custom_alert(f"成功卖出 {sell_shares} 股 {resolved_trade_ticker}！", "success")
                 st.rerun()
             else:
-                show_custom_alert("Insufficient holdings or no position to sell!", "error")
+                show_custom_alert("没有持仓可卖出！", "error")
                 
     st.markdown("---")
     st.subheader("📦 Current Holdings Details")
     if portfolio_details:
         st.dataframe(pd.DataFrame(portfolio_details), use_container_width=True)
-        
-        st.markdown("---")
-        st.subheader("📊 Portfolio Risk & Distribution Analysis")
-        
-        col_pie, col_heat = st.columns(2)
-        
-        with col_pie:
-            st.markdown("#### 行业板块分布 (Sector Allocation)")
-            sector_allocation = {}
-            for t, data in st.session_state.portfolio.items():
-                shares = data["shares"]
-                latest_df = get_stock_data(t, "1D")
-                cur_p = float(latest_df['Close'].iloc[-1]) if not latest_df.empty else data["avg_price"]
-                market_val = shares * cur_p
-                try:
-                    sector = get_stock_info(t).get('sector', 'Others')
-                except:
-                    sector = 'Others'
-                sector_allocation[sector] = sector_allocation.get(sector, 0.0) + market_val
-            
-            if sector_allocation:
-                sec_df = pd.DataFrame(list(sector_allocation.items()), columns=["Sector", "Value"])
-                fig_pie = go.Figure(data=[go.Pie(labels=sec_df["Sector"], values=sec_df["Value"], hole=.3)])
-                fig_pie.update_layout(template="plotly_dark", margin=dict(t=20, b=20, l=20, r=20))
-                st.plotly_chart(fig_pie, use_container_width=True)
-            else:
-                show_custom_alert("暂无行业数据", "info")
 
 elif app_mode == "⚔️ Companies Comparison":
-    st.subheader("⚔️Stock Comparison")
-    
+    st.subheader("⚔️ Stock Comparison")
     col_pk1, col_pk2 = st.columns(2)
     with col_pk1:
         query_a = st.text_input("Enter Company A:", "Apple", key="pk_comp_a")
@@ -647,61 +581,19 @@ elif app_mode == "⚔️ Companies Comparison":
         query_b = st.text_input("Enter Company B:", "Microsoft", key="pk_comp_b")
         resolved_b = get_ticker_from_name(query_b)
 
-    if st.button("Start", key="btn_run_pk"):
+    if st.button("Start Comparison", key="btn_run_pk"):
         if not resolved_a or not resolved_b:
             show_custom_alert("请输入两家有效的公司名称或代码", "error")
         else:
-            with st.spinner("正在获取双方财务数据与基本面信息并进行 AI 深度对比..."):
+            with st.spinner("正在进行 AI 深度对比..."):
                 try:
                     info_a = get_stock_info(resolved_a)
                     info_b = get_stock_info(resolved_b)
-                    
-                    data_a = {
-                        "Ticker": resolved_a,
-                        "Name": info_a.get('shortName', resolved_a),
-                        "MarketCap": f"{info_a.get('marketCap', 0):,}" if isinstance(info_a.get('marketCap'), (int, float)) else 'N/A',
-                        "PE": f"{info_a.get('trailingPE', 'N/A'):.2f}" if isinstance(info_a.get('trailingPE'), (int, float)) else 'N/A',
-                        "PB": f"{info_a.get('priceToBook', 'N/A'):.2f}" if isinstance(info_a.get('priceToBook'), (int, float)) else 'N/A',
-                        "Margin": f"{info_a.get('profitMargins', 0) * 100:.2f}%" if isinstance(info_a.get('profitMargins'), (int, float)) else 'N/A',
-                        "Growth": f"{info_a.get('revenueGrowth', 0) * 100:.2f}%" if isinstance(info_a.get('revenueGrowth'), (int, float)) else 'N/A'
-                    }
-                    data_b = {
-                        "Ticker": resolved_b,
-                        "Name": info_b.get('shortName', resolved_b),
-                        "MarketCap": f"{info_b.get('marketCap', 0):,}" if isinstance(info_b.get('marketCap'), (int, float)) else 'N/A',
-                        "PE": f"{info_b.get('trailingPE', 'N/A'):.2f}" if isinstance(info_b.get('trailingPE'), (int, float)) else 'N/A',
-                        "PB": f"{info_b.get('priceToBook', 'N/A'):.2f}" if isinstance(info_b.get('priceToBook'), (int, float)) else 'N/A',
-                        "Margin": f"{info_b.get('profitMargins', 0) * 100:.2f}%" if isinstance(info_b.get('profitMargins'), (int, float)) else 'N/A',
-                        "Growth": f"{info_b.get('revenueGrowth', 0) * 100:.2f}%" if isinstance(info_b.get('revenueGrowth'), (int, float)) else 'N/A'
-                    }
-                    
                     client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
-                    pk_prompt = f"""你是一位顶级华尔街基金经理与行业研究专家。请对以下两家公司进行全方位的深度 PK 对比评测：
-
-公司 A: {data_a['Name']} ({data_a['Ticker']})
-- 市值: {data_a['MarketCap']}
-- 市盈率 (PE): {data_a['PE']}
-- 市净率 (PB): {data_a['PB']}
-- 利润率: {data_a['Margin']}
-- 营收增长: {data_a['Growth']}
-
-公司 B: {data_b['Name']} ({data_b['Ticker']})
-- 市值: {data_b['MarketCap']}
-- 市盈率 (PE): {data_b['PE']}
-- 市净率 (PB): {data_b['PB']}
-- 利润率: {data_b['Margin']}
-- 营收增长: {data_b['Growth']}
-
-【排版绝对铁律】：
-1. 严禁使用任何 Markdown 表格 (|...|)，必须使用纯文本的标题与分点列表。
-2. 确保排版整洁、层级分明、绝不出现换行混乱。
-
-请从以下几个维度进行深度剖析：
-1. 【商业模式与护城河对比】：谁的护城河更深？核心壁垒是什么？
-2. 【财务健康与估值优劣】：结合 PE, PB, 利润率与增长率，谁的性价比更高？
-3. 【增长潜力与未来催化剂】：谁在未来更有爆发力或更稳健？
-4. 【最终裁决 (Winner)】: 明确给出更推荐哪一家，并给出核心理由。
-"""
+                    pk_prompt = f"""请对比以下两家公司：
+公司 A: {resolved_a} | 市值: {info_a.get('marketCap')} | PE: {info_a.get('trailingPE')}
+公司 B: {resolved_b} | 市值: {info_b.get('marketCap')} | PE: {info_b.get('trailingPE')}
+请从商业模式、估值、增长潜力三个维度对比并给出最终裁决。严禁使用表格，使用分点列出。"""
                     pk_response = client.chat.completions.create(
                         model="llama-3.3-70b-versatile",
                         messages=[{"role": "user", "content": pk_prompt}]

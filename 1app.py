@@ -190,6 +190,7 @@ def get_deep_financials(ticker):
     return metrics
 
 
+
 st.title("📈 AI Financial Terminal ")
 
 try:
@@ -403,9 +404,6 @@ if app_mode == "📊 Data Analysis":
                 d_col5.metric("派息比率 (Payout Ratio)", f"{pay*100:.2f}%" if pay else "N/A", 
                               help="显示公司将多少净利润用于派息。过高可能影响增长，过低说明分红意愿不强。")
 
-                st.markdown("---")
-                st.write("**🤖 AI Fundamental Evaluation:**")
-                # ... (后面保留你原有的 AI 评估逻辑，不需要改动) ...
                 
                 st.markdown("---")
                 st.write("**🤖 AI Fundamental Evaluation:**")

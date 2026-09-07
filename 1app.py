@@ -87,66 +87,45 @@ def get_stock_data(ticker, period):
         return pd.DataFrame()
 
 
-# 采用 yfinance 原生 .info 属性，彻底根治 N/A 问题
-
 @st.cache_data(ttl=600)
-
-def get_stock_info(ticker):
-
-    info_dict = {
-
-        'marketCap': 'N/A',
-
-        'currentPrice': 'N/A',
-
-        'trailingPE': 'N/A',
-
-        'priceToBook': 'N/A',
-
-        'profitMargins': 'N/A',
-
-        'revenueGrowth': 'N/A',
-
-        'shortName': ticker,
-
-        'sector': 'Others'
-
-    }
-
+def get_stock_fundamentals(ticker):
+    stock = yf.Ticker(ticker, session=session)
+    market_cap = "N/A"
+    pe_ratio = "N/A"
+    pb_ratio = "N/A"
     
-
+    # 1. 优先通过 fast_info 获取市值（比 info 稳定）
     try:
-
-        stock = yf.Ticker(ticker, session=session)
-
-        inf = stock.info
-
-        if inf:
-
-            info_dict['marketCap'] = inf.get('marketCap', 'N/A')
-
-            info_dict['currentPrice'] = inf.get('currentPrice', inf.get('regularMarketPrice', 'N/A'))
-
-            info_dict['trailingPE'] = inf.get('trailingPE', 'N/A')
-
-            info_dict['priceToBook'] = inf.get('priceToBook', 'N/A')
-
-            info_dict['profitMargins'] = inf.get('profitMargins', 'N/A')
-
-            info_dict['revenueGrowth'] = inf.get('revenueGrowth', 'N/A')
-
-            info_dict['shortName'] = inf.get('shortName', inf.get('longName', ticker))
-
-            info_dict['sector'] = inf.get('sector', 'Others')
-
-    except Exception:
-
+        fi = stock.fast_info
+        if fi:
+            shares = getattr(fi, 'shares', None)
+            price = getattr(fi, 'last_price', None)
+            if shares and price:
+                market_cap = f"${shares * price:,.0f}"
+    except:
         pass
 
-    return info_dict
+    # 2. 通过 info 获取 PE、PB 以及备用市值
+    try:
+        info = stock.info
+        if info:
+            if market_cap == "N/A" and info.get('marketCap'):
+                market_cap = f"${info['marketCap']:,.0f}"
+                
+            pe = info.get('trailingPE') or info.get('forwardPE')
+            if pe:
+                pe_ratio = f"{pe:.2f}"
+                
+            pb = info.get('priceToBook')
+            if pb:
+                pb_ratio = f"{pb:.2f}"
+    except:
+        pass
+        
+    return market_cap, pe_ratio, pb_ratio
     
 @st.cache_data(ttl=3600)
-def  get_deep_financials(ticker):
+def get_deep_financials(ticker):
     """获取更深入的资产负债表与现金流指标"""
     stock = yf.Ticker(ticker, session=session)
     info = stock.info

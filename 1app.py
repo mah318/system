@@ -86,36 +86,32 @@ def get_stock_data(ticker, period):
     except Exception:
         return pd.DataFrame()
 
-# 采用 yfinance 原生 .info 属性，彻底根治 N/A 问题
 @st.cache_data(ttl=600)
-def get_stock_info(ticker):
-    info_dict = {
-        'marketCap': 'N/A',
-        'currentPrice': 'N/A',
-        'trailingPE': 'N/A',
-        'priceToBook': 'N/A',
-        'profitMargins': 'N/A',
-        'revenueGrowth': 'N/A',
-        'shortName': ticker,
-        'sector': 'Others'
-    }
+def get_stock_fundamentals(ticker):
+    market_cap = "N/A"
+    pe_ratio = "N/A"
+    pb_ratio = "N/A"
     
     try:
         stock = yf.Ticker(ticker, session=session)
-        inf = stock.info
-        if inf:
-            info_dict['marketCap'] = inf.get('marketCap', 'N/A')
-            info_dict['currentPrice'] = inf.get('currentPrice', inf.get('regularMarketPrice', 'N/A'))
-            info_dict['trailingPE'] = inf.get('trailingPE', 'N/A')
-            info_dict['priceToBook'] = inf.get('priceToBook', 'N/A')
-            info_dict['profitMargins'] = inf.get('profitMargins', 'N/A')
-            info_dict['revenueGrowth'] = inf.get('revenueGrowth', 'N/A')
-            info_dict['shortName'] = inf.get('shortName', inf.get('longName', ticker))
-            info_dict['sector'] = inf.get('sector', 'Others')
-    except Exception:
+        
+        # 1. 通过 fast_info 获取市值与最新价（稳定、不触发 401 错误）
+        fi = stock.fast_info
+        if fi:
+            price = getattr(fi, 'last_price', None)
+            shares = getattr(fi, 'shares', None)
+            mcap = getattr(fi, 'market_cap', None)
+            
+            if mcap:
+                market_cap = f"${mcap:,.0f}"
+            elif shares and price:
+                market_cap = f"${shares * price:,.0f}"
+                
+    except Exception as e:
+        # 捕获所有异常，确保绝不崩溃
         pass
-
-    return info_dict
+        
+    return market_cap, pe_ratio, pb_ratio
     
 @st.cache_data(ttl=3600)
 def get_stock_info(ticker):

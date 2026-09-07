@@ -76,6 +76,34 @@ def get_ticker_from_name(query):
         pass
     return query.upper()
 
+@st.cache_data(ttl=3600)
+def get_deep_financials(ticker):
+    """获取更深入的资产负债表与现金流指标"""
+    stock = yf.Ticker(ticker, session=session)
+    info = stock.info
+    
+    # 基础指标，如果不存在则赋为 None
+    metrics = {
+        'debtToEquity': info.get('debtToEquity'),
+        'quickRatio': info.get('quickRatio'),
+        'dividendYield': info.get('dividendYield'),
+        'payoutRatio': info.get('payoutRatio'),
+        'freeCashFlow': 'N/A'
+    }
+    
+    # 尝试从财报数据中计算自由现金流 (FCF)
+    try:
+        cf = stock.cashflow
+        if cf is not None and not cf.empty:
+            # 自由现金流 = 经营现金流 - 资本开支
+            operating_cf = cf.loc['Free Cash Flow'].iloc[0] if 'Free Cash Flow' in cf.index else None
+            if operating_cf:
+                metrics['freeCashFlow'] = operating_cf
+    except:
+        pass
+        
+    return metrics
+
 @st.cache_data(ttl=600)
 def get_stock_data(ticker, period):
     try:
@@ -298,17 +326,46 @@ if app_mode == "📊 Data Analysis":
                 show_custom_alert("暂未获取到该股票的最新新闻数据。", "info")
 
             tab1, tab2, tab3 = st.tabs(["🏢 Fundamentals", "📊 Technical Indicators", "📋 Raw Data"])
-
+            
             with tab1:
                 st.subheader(f"Fundamentals Analysis: {primary_ticker}")
+                
+                # --- 基础估值 ---
                 col1, col2, col3 = st.columns(3)
                 col1.metric("市值 (Market Cap)", market_cap_str)
                 col2.metric("市盈率 (P/E)", pe_str)
                 col3.metric("市净率 (P/B)", pb_str)
                 
-                col4, col5 = st.columns(2)
-                col4.metric("利润率 (Profit Margin)", margin_str)
-                col5.metric("营收增长率 (Revenue Growth)", growth_str)
+                # --- 深度财务健康度 ---
+                st.markdown("---")
+                st.write("**💰 财务健康与现金流 (Deep Fundamentals):**")
+                
+                deep_data = get_deep_financials(primary_ticker)
+                
+                col_d1, col_d2, col_d3 = st.columns(3)
+                
+                # 债务权益比
+                de = deep_data.get('debtToEquity')
+                de_display = f"{de:.2f}" if de else "N/A"
+                col_d1.metric("债务/权益比 (D/E)", de_display, help="衡量杠杆率。数值过高可能存在债务风险。")
+                
+                # 速动比率
+                qr = deep_data.get('quickRatio')
+                qr_display = f"{qr:.2f}" if qr else "N/A"
+                col_d2.metric("速动比率 (Quick Ratio)", qr_display, help="衡量短期偿债能力。通常 > 1 表示资金健康。")
+                
+                # 自由现金流
+                fcf = deep_data.get('freeCashFlow')
+                fcf_display = f"${fcf/1e9:.2f}B" if isinstance(fcf, (int, float)) else "N/A"
+                col_d3.metric("自由现金流 (FCF)", fcf_display, help="公司真正能装进口袋的钱。")
+                
+                # --- 分红信息 ---
+                col_d4, col_d5 = st.columns(2)
+                div = deep_data.get('dividendYield')
+                pay = deep_data.get('payoutRatio')
+                
+                col_d4.metric("股息率 (Dividend Yield)", f"{div*100:.2f}%" if div else "N/A")
+                col_d5.metric("派息比率 (Payout Ratio)", f"{pay*100:.2f}%" if pay else "N/A", help="判断分红是否可持续。")
                 
                 st.markdown("---")
                 st.write("**🤖 AI Fundamental Evaluation:**")

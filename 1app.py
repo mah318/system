@@ -160,32 +160,6 @@ def get_stock_news(ticker):
     except:
         return []
 
-# >>> 在这里插入新函数 <<<
-@st.cache_data(ttl=3600)
-def get_deep_financials(ticker):
-    """获取更深入的资产负债表与现金流指标"""
-    stock = yf.Ticker(ticker, session=session)
-    info = stock.info
-    
-    metrics = {
-        'debtToEquity': info.get('debtToEquity'),
-        'quickRatio': info.get('quickRatio'),
-        'dividendYield': info.get('dividendYield'),
-        'payoutRatio': info.get('payoutRatio'),
-        'freeCashFlow': 'N/A'
-    }
-    
-    try:
-        cf = stock.cashflow
-        if cf is not None and not cf.empty:
-            # 尝试获取自由现金流
-            operating_cf = cf.loc['Free Cash Flow'].iloc[0] if 'Free Cash Flow' in cf.index else None
-            if operating_cf:
-                metrics['freeCashFlow'] = operating_cf
-    except:
-        pass
-        
-    return metrics
 
 st.title("📈 AI Financial Terminal ")
 

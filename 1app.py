@@ -15,8 +15,7 @@ st.set_page_config(page_title="AI Financial Terminal", layout="wide")
 BUILTIN_API_KEY = "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"
 # =================================================================-
 
-session = requests.Session()
-session.headers.update({
+stock = yf.Ticker(ticker)
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 })
 

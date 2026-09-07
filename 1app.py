@@ -87,31 +87,22 @@ def get_stock_data(ticker, period):
         return pd.DataFrame()
 
 @st.cache_data(ttl=600)
-def get_stock_fundamentals(ticker):
-    market_cap = "N/A"
-    pe_ratio = "N/A"
-    pb_ratio = "N/A"
-    
+def get_stock_info(ticker):
+    # 兼容旧代码，防止报错
+    info = {}
     try:
         stock = yf.Ticker(ticker, session=session)
-        
-        # 1. 通过 fast_info 获取市值与最新价（稳定、不触发 401 错误）
         fi = stock.fast_info
         if fi:
             price = getattr(fi, 'last_price', None)
             shares = getattr(fi, 'shares', None)
-            mcap = getattr(fi, 'market_cap', None)
-            
-            if mcap:
-                market_cap = f"${mcap:,.0f}"
-            elif shares and price:
-                market_cap = f"${shares * price:,.0f}"
-                
-    except Exception as e:
-        # 捕获所有异常，确保绝不崩溃
+            if price:
+                info['currentPrice'] = price
+            if shares and price:
+                info['marketCap'] = shares * price
+    except:
         pass
-        
-    return market_cap, pe_ratio, pb_ratio
+    return info
     
 @st.cache_data(ttl=3600)
 def  get_deep_financials(ticker):

@@ -12,7 +12,7 @@ import urllib.parse
 st.set_page_config(page_title="AI Financial Terminal", layout="wide")
 
 # ==================== 在这里直接内置你的 API Key ====================
-BUILTIN_API_KEY = "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"
+BUILTIN_API_KEY = "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"
 # =================================================================-
 
 session = requests.Session()

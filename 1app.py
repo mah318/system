@@ -727,10 +727,26 @@ elif app_mode == "🪙 Trading System":
             
             if sector_allocation:
                 sec_df = pd.DataFrame(list(sector_allocation.items()), columns=["Sector", "Value"])
-                fig_pie = go.Figure(data=[go.Pie(labels=sec_df["Sector"], values=sec_df["Value"], hole=.3)])
-                fig_pie.update_layout(template="plotly_dark", margin=dict(t=20, b=20, l=20, r=20))
-                # 唯一的 key，防止 ID 冲突报错
-                st.plotly_chart(fig_pie, use_container_width=True, key="unique_unique_sector_pie_chart")
+                
+                # 使用 Matplotlib 渲染饼图，彻底杜绝 StreamlitDuplicateElementId 报错
+                import matplotlib.pyplot as plt
+                fig, ax = plt.subplots(figsize=(4, 4))
+                fig.patch.set_facecolor('#0e1117')
+                ax.set_facecolor('#0e1117')
+                
+                wedges, texts, autotexts = ax.pie(
+                    sec_df["Value"], 
+                    labels=sec_df["Sector"], 
+                    autopct='%1.1f%%', 
+                    startangle=90,
+                    colors=['#4CAF50', '#2196F3', '#FF9800', '#E91E63', '#9C27B0', '#00BCD4']
+                )
+                for text in texts:
+                    text.set_color('white')
+                for autotext in autotexts:
+                    autotext.set_color('white')
+                    
+                st.pyplot(fig)
             else:
                 show_custom_alert("暂无行业数据", "info")
                 

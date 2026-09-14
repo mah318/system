@@ -9,30 +9,28 @@ import concurrent.futures
 import json
 import urllib.parse
 
-st.set_page_config(page_title="AI Financial Terminal", layout="wide")
 # 初始化登录状态
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
 
 # 如果没有登录，显示登录界面并拦截后续代码
 if not st.session_state["logged_in"]:
-    st.markdown("<h2 style='text-align: center;'>System Log In</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center;'>🔐 系统登录</h2>", unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        username = st.text_input("username")
-        password = st.text_input("password", type="password")
+        username = st.text_input("用户名")
+        password = st.text_input("密码", type="password")
         
         if st.button("登录", use_container_width=True):
-            # 可以在这里修改你的账号和密码
-           if username == "admin" and password == "888888":
+            if username == "admin" and password == "888888":
                 st.session_state["logged_in"] = True
                 st.rerun()
             else:
                 st.error("用户名或密码错误，请重试")
-    st.stop()  # 阻止未登录时渲染后面的股票图表和功能
+    st.stop()
 
-
+st.set_page_config(page_title="AI Financial Terminal", layout="wide")
 # ==================== 在这里直接内置你的 API Key ====================
 BUILTIN_API_KEY = "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"
 # =================================================================-

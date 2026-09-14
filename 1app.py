@@ -9,6 +9,8 @@ import concurrent.futures
 import json
 import urllib.parse
 
+st.set_page_config(page_title="TradeView", layout="wide")
+
 # Initialize user database (default built-in admin account, password: 888888)
 if "users" not in st.session_state:
     st.session_state["users"] = {"admin": "888888"}
@@ -64,7 +66,7 @@ if st.sidebar.button("Log Out"):
     st.session_state["logged_in"] = False
     st.rerun()
 
-st.set_page_config(page_title="TradeView", layout="wide")
+
 # ==================== 在这里直接内置你的 API Key ====================
 BUILTIN_API_KEY = "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"
 # =================================================================-

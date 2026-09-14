@@ -18,7 +18,7 @@ if "logged_in" not in st.session_state:
 
 # If not logged in, show login/signup interface
 if not st.session_state["logged_in"]:
-    st.markdown("<h2 style='text-align: center;'> System Log In & Sign Up</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center;'> TradeView</h2>", unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
@@ -64,7 +64,7 @@ if st.sidebar.button("Log Out"):
     st.session_state["logged_in"] = False
     st.rerun()
 
-st.set_page_config(page_title="AI Financial Terminal", layout="wide")
+st.set_page_config(page_title="TradeView", layout="wide")
 # ==================== 在这里直接内置你的 API Key ====================
 BUILTIN_API_KEY = "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"
 # =================================================================-

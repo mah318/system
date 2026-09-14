@@ -22,7 +22,7 @@ if not st.session_state["logged_in"]:
         username = st.text_input("Username")
         password = st.text_input("Password", type="password")
         
-        if st.button("登录", use_container_width=True):
+        if st.button("Log In", use_container_width=True):
             if username == "admin" and password == "888888":
                 st.session_state["logged_in"] = True
                 st.rerun()

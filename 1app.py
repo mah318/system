@@ -9,6 +9,7 @@ import concurrent.futures
 import json
 import urllib.parse
 
+st.set_page_config(page_title="AI Financial Terminal", layout="wide")
 # 初始化登录状态
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
@@ -31,7 +32,6 @@ if not st.session_state["logged_in"]:
                 st.error("用户名或密码错误，请重试")
     st.stop()  # 阻止未登录时渲染后面的股票图表和功能
 
-st.set_page_config(page_title="AI Financial Terminal", layout="wide")
 
 # ==================== 在这里直接内置你的 API Key ====================
 BUILTIN_API_KEY = "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"

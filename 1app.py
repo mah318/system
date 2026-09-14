@@ -485,7 +485,7 @@ elif app_mode == "🪙 Trading System":
     if "auto_rules" not in st.session_state:
         st.session_state.auto_rules = []
     
-    # ==================== 🤖 核心：页面加载时自动静默扫描条件单（已移除死循环刷新） ====================
+    # 🤖 核心：页面加载时自动静默扫描条件单（无死循环刷新）
     if st.session_state.auto_rules:
         for rule in st.session_state.auto_rules[:]:
             tk = rule["ticker"]
@@ -540,10 +540,6 @@ elif app_mode == "🪙 Trading System":
                                 show_custom_alert(f"[自动成交] 🎯 目标达成！已自动卖出 {qty} 股 {tk}，成交价: ${cur_p:.2f}", "success")
             except Exception as ex:
                 pass
-        
-        if triggered_any:
-            save_data()
-            st.rerun()
 
     col_tinput, col_tinfo = st.columns([2, 3])
     with col_tinput:
@@ -551,7 +547,6 @@ elif app_mode == "🪙 Trading System":
         resolved_trade_ticker = get_ticker_from_name(trade_query)
     
     trade_price = 0.0
-    trade_returns = pd.Series(dtype=float)
     if resolved_trade_ticker:
         try:
             trade_df = get_stock_data(resolved_trade_ticker, "1y")
@@ -567,9 +562,6 @@ elif app_mode == "🪙 Trading System":
                 except:
                     pass
 
-            if not trade_df.empty:
-                trade_returns = trade_df['Close'].pct_change().dropna()
-
             with col_tinfo:
                 price_display = f"${trade_price:.2f}" if not pd.isna(trade_price) and trade_price > 0 else "N/A"
                 st.markdown(f"""
@@ -577,10 +569,8 @@ elif app_mode == "🪙 Trading System":
                     <b>{resolved_trade_ticker}</b> | Latest Prices: <b style="color: #4CAF50;">{price_display}</b>
                 </div>
                 """, unsafe_allow_html=True)
-            if trade_df.empty:
-                show_custom_alert("未找到该股票的行情数据，请检查输入。", "warning")
         except Exception as e:
-            show_custom_alert(f"获取行情失败: {e}", "warning")
+            pass
 
     st.markdown("---")
 
@@ -687,7 +677,6 @@ elif app_mode == "🪙 Trading System":
             
         submit_rule = st.form_submit_button("Deploy & Activate Rule")
         if submit_rule:
-            # 智能判定：根据你输入的目标价与当前现价的关系自动匹配方向（避免目标价大于现价时产生逻辑误触）
             current_ref_price = trade_price if trade_price > 0 else rule_target_price
             condition_type = "GTE" if rule_target_price >= current_ref_price else "LTE"
             
@@ -740,7 +729,8 @@ elif app_mode == "🪙 Trading System":
                 sec_df = pd.DataFrame(list(sector_allocation.items()), columns=["Sector", "Value"])
                 fig_pie = go.Figure(data=[go.Pie(labels=sec_df["Sector"], values=sec_df["Value"], hole=.3)])
                 fig_pie.update_layout(template="plotly_dark", margin=dict(t=20, b=20, l=20, r=20))
-                st.plotly_chart(fig_pie, use_container_width=True, key="sector_allocation_pie_chart")
+                # 唯一的 key，防止 ID 冲突报错
+                st.plotly_chart(fig_pie, use_container_width=True, key="unique_unique_sector_pie_chart")
             else:
                 show_custom_alert("暂无行业数据", "info")
                 

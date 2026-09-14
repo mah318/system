@@ -478,22 +478,21 @@ if app_mode == "📊 Data Analysis":
 
         except Exception as e:
             show_custom_alert(f"程序运行出错: {e}", "error")
-
+            
 elif app_mode == "🪙 Trading System":
     st.subheader("🪙 Trading & Automated Engine")
     
     if "auto_rules" not in st.session_state:
         st.session_state.auto_rules = []
     
-    # 1. 自动静默扫描条件单（采用智能方向判定，避免因价格高低设置错误而瞬时误触）
+    # ==================== 🤖 核心：页面加载时自动静默扫描条件单（已移除死循环刷新） ====================
     if st.session_state.auto_rules:
-        triggered_any = False
         for rule in st.session_state.auto_rules[:]:
             tk = rule["ticker"]
             act = rule["action"]
             tgt = rule["target_price"]
             qty = rule["shares"]
-            cond = rule.get("condition", "LTE")  # "LTE" (<=) 或 "GTE" (>=)
+            cond = rule.get("condition", "LTE")
             
             try:
                 chk_df = get_stock_data(tk, "1d")
@@ -524,7 +523,7 @@ elif app_mode == "🪙 Trading System":
                                     st.session_state.portfolio[tk] = {"shares": qty, "avg_price": cur_p}
                                 
                                 st.session_state.auto_rules.remove(rule)
-                                triggered_any = True
+                                save_data()
                                 show_custom_alert(f"[自动成交] 🎯 目标达成！已自动买入 {qty} 股 {tk}，成交价: ${cur_p:.2f}", "success")
                         elif act == "SELL":
                             owned = st.session_state.portfolio.get(tk, {}).get("shares", 0)
@@ -537,7 +536,7 @@ elif app_mode == "🪙 Trading System":
                                     st.session_state.portfolio[tk]["shares"] -= qty
                                     
                                 st.session_state.auto_rules.remove(rule)
-                                triggered_any = True
+                                save_data()
                                 show_custom_alert(f"[自动成交] 🎯 目标达成！已自动卖出 {qty} 股 {tk}，成交价: ${cur_p:.2f}", "success")
             except Exception as ex:
                 pass

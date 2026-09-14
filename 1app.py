@@ -215,7 +215,7 @@ def get_stock_news(ticker):
     except:
         return []
 
-st.title("📈 AI Financial Terminal ")
+st.title("📈 TradeView")
 
 try:
     api_key = st.secrets["GROQ_API_KEY"]

@@ -703,7 +703,11 @@ elif app_mode == "🪙 Trading System":
         rules_display_df = pd.DataFrame(st.session_state.auto_rules)
         st.dataframe(rules_display_df.rename(columns={"ticker": "股票", "action": "操作", "target_price": "目标价", "shares": "股数"}), use_container_width=True)
     else:
-        st.info("当前没有挂载中的自动化条件单。")
+      st.markdown("""
+    <div style="background-color: #161616; padding: 14px 18px; border-radius: 8px; border: 1px solid #2a2a2a; color: #888888; font-size: 14px; text-align: center; margin-top: 10px;">
+        ☕ 当前没有挂载中的自动化条件单
+    </div>
+""", unsafe_allow_html=True)
 
     st.markdown("---")
     st.subheader("📦 Current Holdings Details")

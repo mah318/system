@@ -7,16 +7,54 @@ import numpy as np
 import requests
 import concurrent.futures
 import json
+import os
 import urllib.parse
 
 st.set_page_config(page_title="TradeView", layout="wide")
 
-# Initialize user database (default built-in admin account, password: 888888)
+DATA_FILE = "tradeview_data.json"
+
+def load_data():
+    if os.path.exists(DATA_FILE):
+        try:
+            with open(DATA_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            pass
+    return {}
+
+def save_data():
+    data = {
+        "users": st.session_state.get("users", {"admin": "888888"}),
+        "logged_in": st.session_state.get("logged_in", False),
+        "current_user": st.session_state.get("current_user", ""),
+        "cash": st.session_state.get("cash", 100000.0),
+        "portfolio": st.session_state.get("portfolio", {}),
+        "auto_rules": st.session_state.get("auto_rules", [])
+    }
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+
+# Load data from disk on startup
+saved_data = load_data()
+
 if "users" not in st.session_state:
-    st.session_state["users"] = {"admin": "888888"}
+    st.session_state["users"] = saved_data.get("users", {"admin": "888888"})
 
 if "logged_in" not in st.session_state:
-    st.session_state["logged_in"] = False
+    st.session_state["logged_in"] = saved_data.get("logged_in", False)
+
+if "current_user" not in st.session_state:
+    st.session_state["current_user"] = saved_data.get("current_user", "")
+
+if "cash" not in st.session_state:
+    st.session_state["cash"] = saved_data.get("cash", 100000.0)
+
+if "portfolio" not in st.session_state:
+    st.session_state["portfolio"] = saved_data.get("portfolio", {})
+
+if "auto_rules" not in st.session_state:
+    st.session_state["auto_rules"] = saved_data.get("auto_rules", [])
 
 # If not logged in, show login/signup interface
 if not st.session_state["logged_in"]:
@@ -34,6 +72,7 @@ if not st.session_state["logged_in"]:
                 if username in st.session_state["users"] and st.session_state["users"][username] == password:
                     st.session_state["logged_in"] = True
                     st.session_state["current_user"] = username
+                    save_data()
                     st.success("Login successful!")
                     st.rerun()
                 else:
@@ -55,6 +94,7 @@ if not st.session_state["logged_in"]:
                     st.session_state["users"][new_user] = new_pass
                     st.session_state["logged_in"] = True
                     st.session_state["current_user"] = new_user
+                    save_data()
                     st.success("Sign up successful! Logged in automatically.")
                     st.rerun()
                     
@@ -64,6 +104,8 @@ if not st.session_state["logged_in"]:
 st.sidebar.success(f"Current User: {st.session_state.get('current_user', 'User')}")
 if st.sidebar.button("Log Out"):
     st.session_state["logged_in"] = False
+    st.session_state["current_user"] = ""
+    save_data()
     st.rerun()
 
 

@@ -611,8 +611,7 @@ elif app_mode == "🪙 Trading System":
     if portfolio_details:
         st.dataframe(pd.DataFrame(portfolio_details), use_container_width=True)
         
-        st.markdown("---")
-        st.subheader("📊 Portfolio Risk & Distribution Analysis")
+       
         
         col_pie, col_heat = st.columns(2)
         

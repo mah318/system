@@ -661,7 +661,7 @@ elif app_mode == "🪙 Trading System":
                 
     st.markdown("---")
 
-    st.subheader("🤖 自动化条件单引擎 (Automated Condition Orders)")
+    st.subheader("Automated Condition Orders")
     
     with st.form("auto_trade_rule_form"):
         st.markdown("##### 挂载自动化交易策略")
@@ -732,64 +732,7 @@ elif app_mode == "🪙 Trading System":
             else:
                 show_custom_alert("暂无行业数据", "info")
                 
-    st.markdown("---")
-    st.subheader("📦 Current Holdings Details")
-    if portfolio_details:
-        st.dataframe(pd.DataFrame(portfolio_details), use_container_width=True)
-        
-        col_pie, col_heat = st.columns(2)
-        
-        with col_pie:
-            st.markdown("#### 行业板块分布 (Sector Allocation)")
-            sector_allocation = {}
-            for t, data in st.session_state.portfolio.items():
-                shares = data["shares"]
-                latest_df = get_stock_data(t, "1D")
-                cur_p = float(latest_df['Close'].iloc[-1]) if not latest_df.empty else data["avg_price"]
-                market_val = shares * cur_p
-                try:
-                    sector = get_stock_info(t).get('sector', 'Others')
-                except:
-                    sector = 'Others'
-                sector_allocation[sector] = sector_allocation.get(sector, 0.0) + market_val
-            
-            if sector_allocation:
-                sec_df = pd.DataFrame(list(sector_allocation.items()), columns=["Sector", "Value"])
-                fig_pie = go.Figure(data=[go.Pie(labels=sec_df["Sector"], values=sec_df["Value"], hole=.3)])
-                fig_pie.update_layout(template="plotly_dark", margin=dict(t=20, b=20, l=20, r=20))
-                st.plotly_chart(fig_pie, use_container_width=True)
-            else:
-                show_custom_alert("暂无行业数据", "info")
-
-    st.markdown("---")
-    st.subheader("📦 Current Holdings Details")
-    if portfolio_details:
-        st.dataframe(pd.DataFrame(portfolio_details), use_container_width=True)
-        
-        col_pie, col_heat = st.columns(2)
-        
-        with col_pie:
-            st.markdown("#### 行业板块分布 (Sector Allocation)")
-            sector_allocation = {}
-            for t, data in st.session_state.portfolio.items():
-                shares = data["shares"]
-                latest_df = get_stock_data(t, "1D")
-                cur_p = float(latest_df['Close'].iloc[-1]) if not latest_df.empty else data["avg_price"]
-                market_val = shares * cur_p
-                try:
-                    sector = get_stock_info(t).get('sector', 'Others')
-                except:
-                    sector = 'Others'
-                sector_allocation[sector] = sector_allocation.get(sector, 0.0) + market_val
-            
-            if sector_allocation:
-                sec_df = pd.DataFrame(list(sector_allocation.items()), columns=["Sector", "Value"])
-                fig_pie = go.Figure(data=[go.Pie(labels=sec_df["Sector"], values=sec_df["Value"], hole=.3)])
-                fig_pie.update_layout(template="plotly_dark", margin=dict(t=20, b=20, l=20, r=20))
-                st.plotly_chart(fig_pie, use_container_width=True)
-            else:
-                show_custom_alert("暂无行业数据", "info")
-
+    
 elif app_mode == "⚔️ Companies Comparison":
     st.subheader("⚔️Stock Comparison")
     

@@ -15,12 +15,12 @@ if "logged_in" not in st.session_state:
 
 # 如果没有登录，显示登录界面并拦截后续代码
 if not st.session_state["logged_in"]:
-    st.markdown("<h2 style='text-align: center;'>🔐 系统登录</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center;'> System Log In </h2>", unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        username = st.text_input("用户名")
-        password = st.text_input("密码", type="password")
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
         
         if st.button("登录", use_container_width=True):
             if username == "admin" and password == "888888":

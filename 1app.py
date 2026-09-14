@@ -9,26 +9,60 @@ import concurrent.futures
 import json
 import urllib.parse
 
-# 初始化登录状态
+# Initialize user database (default built-in admin account, password: 888888)
+if "users" not in st.session_state:
+    st.session_state["users"] = {"admin": "888888"}
+
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
 
-# 如果没有登录，显示登录界面并拦截后续代码
+# If not logged in, show login/signup interface
 if not st.session_state["logged_in"]:
-    st.markdown("<h2 style='text-align: center;'> System Log In </h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center;'> System Log In & Sign Up</h2>", unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
+        auth_mode = st.radio("Select Action", ["Log In", "Sign Up"], horizontal=True)
         
-        if st.button("Log In", use_container_width=True):
-            if username == "admin" and password == "888888":
-                st.session_state["logged_in"] = True
-                st.rerun()
-            else:
-                st.error("用户名或密码错误，请重试")
-    st.stop()
+        if auth_mode == "Log In":
+            username = st.text_input("Username", key="login_user")
+            password = st.text_input("Password", type="password", key="login_pass")
+            
+            if st.button("Log In", use_container_width=True):
+                if username in st.session_state["users"] and st.session_state["users"][username] == password:
+                    st.session_state["logged_in"] = True
+                    st.session_state["current_user"] = username
+                    st.success("Login successful!")
+                    st.rerun()
+                else:
+                    st.error("Invalid username or password, please try again.")
+                    
+        else:  # Sign Up mode
+            new_user = st.text_input("Choose a Username", key="signup_user")
+            new_pass = st.text_input("Choose a Password", type="password", key="signup_pass")
+            confirm_pass = st.text_input("Confirm Password", type="password", key="signup_confirm")
+            
+            if st.button("Sign Up & Enter", use_container_width=True):
+                if not new_user or not new_pass:
+                    st.error("Username and password cannot be empty!")
+                elif new_user in st.session_state["users"]:
+                    st.error("Username already exists, please log in directly!")
+                elif new_pass != confirm_pass:
+                    st.error("Passwords do not match!")
+                else:
+                    st.session_state["users"][new_user] = new_pass
+                    st.session_state["logged_in"] = True
+                    st.session_state["current_user"] = new_user
+                    st.success("Sign up successful! Logged in automatically.")
+                    st.rerun()
+                    
+    st.stop()  # Block access to subsequent code until logged in
+
+# ==================== Sidebar info after logging in ====================
+st.sidebar.success(f"Current User: {st.session_state.get('current_user', 'User')}")
+if st.sidebar.button("Log Out"):
+    st.session_state["logged_in"] = False
+    st.rerun()
 
 st.set_page_config(page_title="AI Financial Terminal", layout="wide")
 # ==================== 在这里直接内置你的 API Key ====================

@@ -733,7 +733,7 @@ elif app_mode == "🪙 Trading System":
                 sec_df = pd.DataFrame(list(sector_allocation.items()), columns=["Sector", "Value"])
                 fig_pie = go.Figure(data=[go.Pie(labels=sec_df["Sector"], values=sec_df["Value"], hole=.3)])
                 fig_pie.update_layout(template="plotly_dark", margin=dict(t=20, b=20, l=20, r=20))
-                st.plotly_chart(fig_pie, use_container_width=True)
+               st.plotly_chart(fig_pie, use_container_width=True, key="sector_allocation_pie_chart")
             else:
                 show_custom_alert("暂无行业数据", "info")
 

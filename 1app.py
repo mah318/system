@@ -661,7 +661,7 @@ elif app_mode == "🪙 Trading System":
                 
     st.markdown("---")
 
-    st.subheader("Automated Condition Orders")
+    st.subheader("🤖 自动化条件单引擎 (Automated Condition Orders)")
     
     with st.form("auto_trade_rule_form"):
         st.markdown("##### 挂载自动化交易策略")
@@ -728,7 +728,6 @@ elif app_mode == "🪙 Trading System":
             if sector_allocation:
                 sec_df = pd.DataFrame(list(sector_allocation.items()), columns=["Sector", "Value"])
                 sec_df = sec_df.set_index("Sector")
-                # 使用 Streamlit 原生自带的柱状图，零外部依赖、零报错
                 st.bar_chart(sec_df)
             else:
                 show_custom_alert("暂无行业数据", "info")

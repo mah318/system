@@ -727,26 +727,9 @@ elif app_mode == "🪙 Trading System":
             
             if sector_allocation:
                 sec_df = pd.DataFrame(list(sector_allocation.items()), columns=["Sector", "Value"])
-                
-                # 使用 Matplotlib 渲染饼图，彻底杜绝 StreamlitDuplicateElementId 报错
-                import matplotlib.pyplot as plt
-                fig, ax = plt.subplots(figsize=(4, 4))
-                fig.patch.set_facecolor('#0e1117')
-                ax.set_facecolor('#0e1117')
-                
-                wedges, texts, autotexts = ax.pie(
-                    sec_df["Value"], 
-                    labels=sec_df["Sector"], 
-                    autopct='%1.1f%%', 
-                    startangle=90,
-                    colors=['#4CAF50', '#2196F3', '#FF9800', '#E91E63', '#9C27B0', '#00BCD4']
-                )
-                for text in texts:
-                    text.set_color('white')
-                for autotext in autotexts:
-                    autotext.set_color('white')
-                    
-                st.pyplot(fig)
+                sec_df = sec_df.set_index("Sector")
+                # 使用 Streamlit 原生自带的柱状图，零外部依赖、零报错
+                st.bar_chart(sec_df)
             else:
                 show_custom_alert("暂无行业数据", "info")
                 

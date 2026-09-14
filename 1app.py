@@ -25,7 +25,7 @@ if not st.session_state["logged_in"]:
         
         if st.button("登录", use_container_width=True):
             # 可以在这里修改你的账号和密码
-            if username == "admin" && password == "888888":
+           if username == "admin" and password == "888888":
                 st.session_state["logged_in"] = True
                 st.rerun()
             else:

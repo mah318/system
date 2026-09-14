@@ -480,7 +480,11 @@ if app_mode == "📊 Data Analysis":
             show_custom_alert(f"程序运行出错: {e}", "error")
 
 elif app_mode == "🪙 Trading System":
-    st.subheader("🪙 Trading")
+    st.subheader("🪙 Trading & Automated Engine")
+    
+    # 初始化自动化规则存储状态
+    if "auto_rules" not in st.session_state:
+        st.session_state.auto_rules = []
     
     col_tinput, col_tinfo = st.columns([2, 3])
     with col_tinput:
@@ -554,10 +558,11 @@ elif app_mode == "🪙 Trading System":
     mcol4.metric("累计盈亏", f"${total_profit:+,.2f}")
     st.markdown("---")
     
+    # ==================== 手动买入/卖出板块 ====================
     col_buy, col_sell = st.columns(2)
     
     with col_buy:
-        st.markdown(f"#### 🟢 Buy: `{resolved_trade_ticker}`")
+        st.markdown(f"#### 🟢 Manual Buy: `{resolved_trade_ticker}`")
         buy_shares = st.number_input("买入股数", min_value=1, value=10, step=1, key="ind_buy_shares")
         total_cost = buy_shares * trade_price if trade_price > 0 else 0
         st.write(f"预计总花费: **${total_cost:,.2f}**")
@@ -582,7 +587,7 @@ elif app_mode == "🪙 Trading System":
                 show_custom_alert("可用现金不足，无法买入！", "error")
 
     with col_sell:
-        st.markdown(f"#### 🔴 Sell: `{resolved_trade_ticker}`")
+        st.markdown(f"#### 🔴 Manual Sell: `{resolved_trade_ticker}`")
         owned_shares = st.session_state.portfolio.get(resolved_trade_ticker, {}).get("shares", 0)
         st.write(f"当前持有该股票数量: **{owned_shares} 股**")
         
@@ -607,11 +612,103 @@ elif app_mode == "🪙 Trading System":
                 show_custom_alert("Insufficient holdings or no position to sell!", "error")
                 
     st.markdown("---")
+
+    st.subheader("Algorithmic Condition Orders")
+    
+    with st.form("auto_trade_rule_form"):
+        st.markdown("##### 挂载自动化交易策略")
+        ac1, ac2, ac3, ac4 = st.columns(4)
+        with ac1:
+            rule_ticker = st.text_input("目标股票代码", value=resolved_trade_ticker or "AAPL").upper()
+        with ac2:
+            rule_action = st.selectbox("触发操作", ["BUY", "SELL"])
+        with ac3:
+            rule_target_price = st.number_input("触发目标价 ($)", value=float(trade_price) if trade_price > 0 else 100.0, min_value=0.01)
+        with ac4:
+            rule_shares = st.number_input("交易股数", min_value=1, value=10, step=1)
+            
+        submit_rule = st.form_submit_button("Deploy & Activate Rule")
+        if submit_rule:
+            st.session_state.auto_rules.append({
+                "ticker": rule_ticker,
+                "action": rule_action,
+                "target_price": rule_target_price,
+                "shares": rule_shares
+            })
+            show_custom_alert(f"已成功部署策略：当 {rule_ticker} 价格达到 ${rule_target_price:.2f} 时自动执行 {rule_action} {rule_shares} 股", "success")
+
+    # 扫描并执行自动化规则按钮
+    if st.session_state.auto_rules:
+        col_scan1, col_scan2 = st.columns([1, 4])
+        with col_scan1:
+            if st.button("🔄 扫描市场并触发条件单"):
+                triggered_any = False
+                for rule in st.session_state.auto_rules[:]:
+                    tk = rule["ticker"]
+                    act = rule["action"]
+                    tgt = rule["target_price"]
+                    qty = rule["shares"]
+                    
+                    try:
+                        # 获取当前最新价
+                        chk_df = get_stock_data(tk, "1d")
+                        cur_p = float(chk_df['Close'].iloc[-1]) if not chk_df.empty else 0.0
+                        if cur_p <= 0:
+                            inf_chk = get_stock_info(tk)
+                            cur_p = float(inf_chk.get('currentPrice') or 0.0)
+                            
+                        if cur_p > 0:
+                            # 买入触发：当前价 <= 目标价
+                            if act == "BUY" and cur_p <= tgt:
+                                cost = cur_p * qty
+                                if st.session_state.cash >= cost:
+                                    st.session_state.cash -= cost
+                                    if tk in st.session_state.portfolio:
+                                        o_sh = st.session_state.portfolio[tk]["shares"]
+                                        o_avg = st.session_state.portfolio[tk]["avg_price"]
+                                        n_sh = o_sh + qty
+                                        n_avg = ((o_sh * o_avg) + cost) / n_sh
+                                        st.session_state.portfolio[tk] = {"shares": n_sh, "avg_price": n_avg}
+                                    else:
+                                        st.session_state.portfolio[tk] = {"shares": qty, "avg_price": cur_p}
+                                    
+                                    st.session_state.auto_rules.remove(rule)
+                                    triggered_any = True
+                                    show_custom_alert(f"[自动成交] 成功买入 {qty} 股 {tk}，触发价: ${cur_p:.2f}", "success")
+                                    
+                            # 卖出触发：当前价 >= 目标价
+                            elif act == "SELL" and cur_p >= tgt:
+                                owned = st.session_state.portfolio.get(tk, {}).get("shares", 0)
+                                if owned >= qty:
+                                    earned = cur_p * qty
+                                    st.session_state.cash += earned
+                                    if owned == qty:
+                                        del st.session_state.portfolio[tk]
+                                    else:
+                                        st.session_state.portfolio[tk]["shares"] -= qty
+                                        
+                                    st.session_state.auto_rules.remove(rule)
+                                    triggered_any = True
+                                    show_custom_alert(f"[自动成交] 成功卖出 {qty} 股 {tk}，触发价: ${cur_p:.2f}", "success")
+                    except Exception as ex:
+                        pass
+                
+                if triggered_any:
+                    save_data()
+                    st.rerun()
+                else:
+                    show_custom_alert("扫描完成，当前暂无满足触发条件的挂单。", "info")
+                    
+        # 展示当前生效的策略列表
+        rules_display_df = pd.DataFrame(st.session_state.auto_rules)
+        st.dataframe(rules_display_df.rename(columns={"ticker": "股票", "action": "操作", "target_price": "目标价", "shares": "股数"}), use_container_width=True)
+    else:
+        st.info("当前没有挂载中的自动化条件单。")
+
+    st.markdown("---")
     st.subheader("📦 Current Holdings Details")
     if portfolio_details:
         st.dataframe(pd.DataFrame(portfolio_details), use_container_width=True)
-        
-       
         
         col_pie, col_heat = st.columns(2)
         

@@ -8,6 +8,7 @@ import requests
 import json
 import os
 import urllib.parse
+import concurrent.futures
 
 st.set_page_config(page_title="TradeView", layout="wide")
 

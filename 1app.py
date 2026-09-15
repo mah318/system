@@ -618,7 +618,7 @@ elif app_mode == "🪙 Trading System":
     col_buy, col_sell = st.columns(2)
     
     with col_buy:
-        st.markdown(f"#### 🟢 Manual Buy: `{resolved_trade_ticker}`")
+        st.markdown(f"#### 🟢 Buy: `{resolved_trade_ticker}`")
         buy_shares = st.number_input("买入股数", min_value=1, value=10, step=1, key="ind_buy_shares")
         total_cost = buy_shares * trade_price if trade_price > 0 else 0
         st.write(f"预计总花费: **${total_cost:,.2f}**")
@@ -643,7 +643,7 @@ elif app_mode == "🪙 Trading System":
                 show_custom_alert("可用现金不足，无法买入！", "error")
 
     with col_sell:
-        st.markdown(f"#### 🔴 Manual Sell: `{resolved_trade_ticker}`")
+        st.markdown(f"#### 🔴 Sell: `{resolved_trade_ticker}`")
         owned_shares = st.session_state.portfolio.get(resolved_trade_ticker, {}).get("shares", 0)
         st.write(f"当前持有该股票数量: **{owned_shares} 股**")
         

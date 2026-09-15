@@ -195,6 +195,35 @@ def get_stock_news(ticker):
     except Exception:
         return []
 
+@st.cache_data(ttl=3600)
+def get_deep_financials(ticker):
+    """获取更深入的资产负债表与现金流指标"""
+    metrics = {
+        'debtToEquity': 'N/A',
+        'quickRatio': 'N/A',
+        'dividendYield': 'N/A',
+        'payoutRatio': 'N/A',
+        'freeCashFlow': 'N/A'
+    }
+    try:
+        stock = yf.Ticker(ticker, session=session)
+        info = stock.info
+        if info:
+            metrics['debtToEquity'] = info.get('debtToEquity', 'N/A')
+            metrics['quickRatio'] = info.get('quickRatio', 'N/A')
+            metrics['dividendYield'] = info.get('dividendYield', 'N/A')
+            metrics['payoutRatio'] = info.get('payoutRatio', 'N/A')
+        
+        cf = stock.cashflow
+        if cf is not None and not cf.empty:
+            operating_cf = cf.loc['Free Cash Flow'].iloc[0] if 'Free Cash Flow' in cf.index else None
+            if operating_cf:
+                metrics['freeCashFlow'] = operating_cf
+    except Exception:
+        pass
+        
+    return metrics
+
 st.title("📈 TradeView")
 
 try:

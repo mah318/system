@@ -5,6 +5,7 @@ from openai import OpenAI
 import pandas as pd
 import numpy as np
 import requests
+import concurrent.futures
 import json
 import os
 import urllib.parse
@@ -18,7 +19,7 @@ def load_data():
         try:
             with open(DATA_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except Exception:
+        except:
             pass
     return {}
 
@@ -107,12 +108,42 @@ if st.sidebar.button("Log Out"):
     save_data()
     st.rerun()
 
+
+# ==================== 在这里直接内置你的 API Key ====================
 BUILTIN_API_KEY = "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"
+# =================================================================-
 
 session = requests.Session()
 session.headers.update({
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 })
+
+def load_data():
+    try:
+        encoded_data = st.query_params.get("portfolio_data", None)
+        if encoded_data:
+            decoded_json = urllib.parse.unquote(encoded_data)
+            return json.loads(decoded_json)
+    except Exception:
+        pass
+    return {"cash": 100000.0, "portfolio": {}}
+
+def save_data():
+    try:
+        data = {
+            "cash": st.session_state.cash,
+            "portfolio": st.session_state.portfolio
+        }
+        json_str = json.dumps(data, ensure_ascii=False)
+        st.query_params["portfolio_data"] = urllib.parse.quote(json_str)
+    except Exception as e:
+        print(f"Save error: {e}")
+
+saved_data = load_data()
+if 'cash' not in st.session_state:
+    st.session_state.cash = saved_data.get("cash", 100000.0)
+if 'portfolio' not in st.session_state:
+    st.session_state.portfolio = saved_data.get("portfolio", {})
 
 def show_custom_alert(text, alert_type="info"):
     colors = {
@@ -143,6 +174,7 @@ def get_ticker_from_name(query):
         pass
     return query.upper()
 
+
 @st.cache_data(ttl=600)
 def get_stock_data(ticker, period):
     try:
@@ -152,6 +184,8 @@ def get_stock_data(ticker, period):
     except Exception:
         return pd.DataFrame()
 
+
+# 采用 yfinance 原生 .info 属性，彻底根治 N/A 问题
 @st.cache_data(ttl=600)
 def get_stock_info(ticker):
     info_dict = {
@@ -164,6 +198,7 @@ def get_stock_info(ticker):
         'shortName': ticker,
         'sector': 'Others'
     }
+    
     try:
         stock = yf.Ticker(ticker, session=session)
         inf = stock.info
@@ -178,7 +213,36 @@ def get_stock_info(ticker):
             info_dict['sector'] = inf.get('sector', 'Others')
     except Exception:
         pass
+
     return info_dict
+
+@st.cache_data(ttl=3600)
+def get_deep_financials(ticker):
+    """获取更深入的资产负债表与现金流指标"""
+    stock = yf.Ticker(ticker, session=session)
+    info = stock.info
+    
+    # 基础指标，如果不存在则赋为 None
+    metrics = {
+        'debtToEquity': info.get('debtToEquity'),
+        'quickRatio': info.get('quickRatio'),
+        'dividendYield': info.get('dividendYield'),
+        'payoutRatio': info.get('payoutRatio'),
+        'freeCashFlow': 'N/A'
+    }
+    
+    # 尝试从财报数据中计算自由现金流 (FCF)
+    try:
+        cf = stock.cashflow
+        if cf is not None and not cf.empty:
+            # 自由现金流 = 经营现金流 - 资本开支
+            operating_cf = cf.loc['Free Cash Flow'].iloc[0] if 'Free Cash Flow' in cf.index else None
+            if operating_cf:
+                metrics['freeCashFlow'] = operating_cf
+    except:
+        pass
+        
+    return metrics
 
 @st.cache_data(ttl=600)
 def get_stock_news(ticker):
@@ -192,16 +256,15 @@ def get_stock_news(ticker):
                 if title:
                     titles.append(title)
         return titles[:5]
-    except Exception:
+    except:
         return []
 
 st.title("📈 TradeView")
 
 try:
     api_key = st.secrets["GROQ_API_KEY"]
-except Exception:
+except:
     api_key = BUILTIN_API_KEY
-
 st.sidebar.header("Function")
 app_mode = st.sidebar.radio("Select Mode", ["📊 Data Analysis", "🪙 Trading System", "⚔️ Companies Comparison", "🏆 Top 50 Companies"])
 

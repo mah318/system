@@ -265,8 +265,7 @@ try:
     api_key = st.secrets["GROQ_API_KEY"]
 except:
     api_key = BUILTIN_API_KEY
-st.sidebar.header("Function")
-app_mode = st.sidebar.radio("Select Mode", ["📊 Data Analysis", "🪙 Trading System", "⚔️ Companies Comparison", "🏆 Top 50 Companies"])
+    
 
 st.sidebar.header("Function")
 app_mode = st.sidebar.radio("Select Mode", ["📊 Data Analysis", "🪙 Trading System", "⚔️ Companies Comparison", "🏆 Top 50 Companies"])

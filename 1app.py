@@ -489,11 +489,10 @@ with tab2:
     else:
         st.warning("No technical data available.")
 
-with tab3:
-    st.subheader(f"{primary_ticker} 原始数据预览")
-    st.dataframe(df_primary.tail(10))
-      
-            
+ with tab3:
+        st.subheader(f"{primary_ticker} 原始数据预览")
+        st.dataframe(df_primary.tail(10))
+
 elif app_mode == "🪙 Trading System":
     st.subheader("🪙 Trading & Automated Engine")
     

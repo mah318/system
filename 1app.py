@@ -298,38 +298,40 @@ if app_mode == "📊 Data Analysis":
                 growth_str = "N/A"
         except Exception as e:
             show_custom_alert(f"数据加载出错: {e}", "error")
-            
-            delta = df_primary['Close'].diff()
-            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-            rs = gain / loss
-            df_primary['RSI'] = 100 - (100 / (1 + rs))
-            ema12 = df_primary['Close'].ewm(span=12, adjust=False).mean()
-            ema26 = df_primary['Close'].ewm(span=26, adjust=False).mean()
-            df_primary['MACD'] = ema12 - ema26
-            df_primary['Signal'] = df_primary['MACD'].ewm(span=9, adjust=False).mean()
+            st.stop()
 
-            latest = df_primary.iloc[-1]
+        # 🟢 核心修复：将后续分析逻辑正确对齐到主干流程，不再受外层 except 影响
+        delta = df_primary['Close'].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+        rs = gain / loss
+        df_primary['RSI'] = 100 - (100 / (1 + rs))
+        ema12 = df_primary['Close'].ewm(span=12, adjust=False).mean()
+        ema26 = df_primary['Close'].ewm(span=26, adjust=False).mean()
+        df_primary['MACD'] = ema12 - ema26
+        df_primary['Signal'] = df_primary['MACD'].ewm(span=9, adjust=False).mean()
 
-            st.subheader(f"Dashboard: {primary_ticker}")
-            if not api_key or api_key == "你的API_KEY填在这里":
-                show_custom_alert("检测到未正确配置 API Key，请配置对应的 Key。", "warning")
-            else:
-                try:
-                    client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
-                    
-                    models_response = client.models.list()
-                    available_models = [m.id for m in models_response.data]
-                    
-                    auto_model = available_models[0] if available_models else "openai/gpt-oss-120b"
-                    for m in available_models:
-                        if any(k in m.lower() for k in ['chat', 'versatile', 'instant', '8b', '70b', 'gpt-oss', 'instruct']):
-                            auto_model = m
-                            break
+        latest = df_primary.iloc[-1]
 
-                    tech_summary = f"RSI(14): {latest['RSI']:.2f}, MACD: {latest['MACD']:.2f}"
-                    
-                    signal_prompt = f"""你是一位资深的华尔街量化投资经理与风险控制专家。请基于以下多维财务与技术数据，对 {primary_ticker} 进行严谨的专业量化评估：
+        st.subheader(f"Dashboard: {primary_ticker}")
+        if not api_key or api_key == "你的API_KEY填在这里":
+            show_custom_alert("检测到未正确配置 API Key，请配置对应的 Key。", "warning")
+        else:
+            try:
+                client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
+                
+                models_response = client.models.list()
+                available_models = [m.id for m in models_response.data]
+                
+                auto_model = available_models[0] if available_models else "openai/gpt-oss-120b"
+                for m in available_models:
+                    if any(k in m.lower() for k in ['chat', 'versatile', 'instant', '8b', '70b', 'gpt-oss', 'instruct']):
+                        auto_model = m
+                        break
+
+                tech_summary = f"RSI(14): {latest['RSI']:.2f}, MACD: {latest['MACD']:.2f}"
+                
+                signal_prompt = f"""你是一位资深的华尔街量化投资经理与风险控制专家。请基于以下多维财务与技术数据，对 {primary_ticker} 进行严谨的专业量化评估：
 
 - 核心技术面 (近1个月): {tech_summary}
 - 核心基本面: PE市盈率={pe_str}, PB市净率={pb_str}, 利润率={margin_str}, 营收增长={growth_str}
@@ -349,32 +351,32 @@ if app_mode == "📊 Data Analysis":
 【多空博弈核心逻辑】(60字以内)
 【关键支撑与风控点】(各一句话)
 """
-                    signal_response = client.chat.completions.create(
-                        model=auto_model,
-                        messages=[{"role": "user", "content": signal_prompt}]
-                    )
-                    ai_signal_text = signal_response.choices[0].message.content
-                    
-                    st.markdown(f"""
-                    <div style="background-color: #1a1a1a; padding: 18px; border-radius: 10px; border: 1px solid #333333; color: #f0f0f0; font-size: 15px; line-height: 1.7; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
-                        {ai_signal_text.replace('\n', '<br>')}
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                except Exception as ai_err:
-                    show_custom_alert(f"AI 智能决策请求失败: {ai_err}", "error")
-
-            st.markdown("---")
-            st.subheader(f"📰 News Sentiment & Analysis: {primary_ticker}")
-            news_titles = get_stock_news(primary_ticker)
-            if news_titles:
-                st.write("**最新相关新闻标题：**")
-                for title in news_titles:
-                    st.markdown(f"- {title}")
+                signal_response = client.chat.completions.create(
+                    model=auto_model,
+                    messages=[{"role": "user", "content": signal_prompt}]
+                )
+                ai_signal_text = signal_response.choices[0].message.content
                 
-                if api_key and api_key != "你的API_KEY填在这里":
-                    try:
-                        news_prompt = f"""请基于以下关于股票 {primary_ticker} 的最新新闻标题，进行专业的情感分析与舆情评估：
+                st.markdown(f"""
+                <div style="background-color: #1a1a1a; padding: 18px; border-radius: 10px; border: 1px solid #333333; color: #f0f0f0; font-size: 15px; line-height: 1.7; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                    {ai_signal_text.replace('\n', '<br>')}
+                </div>
+                """, unsafe_allow_html=True)
+                
+            except Exception as ai_err:
+                show_custom_alert(f"AI 智能决策请求失败: {ai_err}", "error")
+
+        st.markdown("---")
+        st.subheader(f"📰 News Sentiment & Analysis: {primary_ticker}")
+        news_titles = get_stock_news(primary_ticker)
+        if news_titles:
+            st.write("**最新相关新闻标题：**")
+            for title in news_titles:
+                st.markdown(f"- {title}")
+            
+            if api_key and api_key != "你的API_KEY填在这里":
+                try:
+                    news_prompt = f"""请基于以下关于股票 {primary_ticker} 的最新新闻标题，进行专业的情感分析与舆情评估：
 新闻列表：
 {chr(10).join([f'- {t}' for t in news_titles])}
 
@@ -384,114 +386,108 @@ if app_mode == "📊 Data Analysis":
 【舆情综合得分】(0-100分)
 【核心事件与市场影响总结】(80字以内)
 """
-                        news_response = client.chat.completions.create(
-                            model=auto_model,
-                            messages=[{"role": "user", "content": news_prompt}]
-                        )
-                        st.markdown(f"""
-                        <div style="background-color: #1a1a1a; padding: 16px; border-radius: 8px; border: 1px solid #333333; color: #f0f0f0; font-size: 14px; line-height: 1.6;">
-                            {news_response.choices[0].message.content.replace('\n', '<br>')}
-                        </div>
-                        """, unsafe_allow_html=True)
-                    except Exception as e:
-                        show_custom_alert(f"新闻舆情 AI 分析失败: {e}", "warning")
-                else:
-                    show_custom_alert("请配置 API Key 以启用 AI 新闻舆情情感打分功能。", "warning")
-            else:
-                show_custom_alert("暂未获取到该股票的最新新闻数据。", "info")
-
-            tab1, tab2, tab3 = st.tabs(["🏢 Fundamentals", "📊 Technical Indicators", "📋 Raw Data"])
-            
-            with tab1:
-                st.subheader(f"Fundamentals Analysis: {primary_ticker}")
-                
-                # --- 基础估值 ---
-                col1, col2, col3 = st.columns(3)
-                col1.metric("市值 (Market Cap)", market_cap_str)
-                col2.metric("市盈率 (P/E)", pe_str)
-                col3.metric("市净率 (P/B)", pb_str)
-                
-                # --- 深度财务健康度 ---
-                st.markdown("---")
-                st.write("**💰 财务健康与现金流 (Deep Fundamentals):**")
-                
-                deep_data = get_deep_financials(primary_ticker)
-                
-                col_d1, col_d2, col_d3 = st.columns(3)
-                
-                # 债务权益比
-                de = deep_data.get('debtToEquity')
-                de_display = f"{de:.2f}" if de else "N/A"
-                col_d1.metric("债务/权益比 (D/E)", de_display, help="衡量杠杆率。数值过高可能存在债务风险。")
-                
-                # 速动比率
-                qr = deep_data.get('quickRatio')
-                qr_display = f"{qr:.2f}" if qr else "N/A"
-                col_d2.metric("速动比率 (Quick Ratio)", qr_display, help="衡量短期偿债能力。通常 > 1 表示资金健康。")
-                
-                # 自由现金流
-                fcf = deep_data.get('freeCashFlow')
-                fcf_display = f"${fcf/1e9:.2f}B" if isinstance(fcf, (int, float)) else "N/A"
-                col_d3.metric("自由现金流 (FCF)", fcf_display, help="公司真正能装进口袋的钱。")
-                
-                # --- 分红信息 ---
-                col_d4, col_d5 = st.columns(2)
-                div = deep_data.get('dividendYield')
-                pay = deep_data.get('payoutRatio')
-                
-                col_d4.metric("股息率 (Dividend Yield)", f"{div*100:.2f}%" if div else "N/A")
-                col_d5.metric("派息比率 (Payout Ratio)", f"{pay*100:.2f}%" if pay else "N/A", help="判断分红是否可持续。")
- 
-                st.markdown("---")
-                st.write("**🤖 AI Fundamental Evaluation:**")
-                if api_key and api_key != "你的API_KEY填在这里":
-                    try:
-                        fund_prompt = f"基于 {primary_ticker} 的硬性数据（PE: {pe_str}, PB: {pb_str}, 利润率: {margin_str}, 营收增长: {growth_str}），请用数据推导列出5项核心基本面评价。"
-                        fund_response = client.chat.completions.create(
-                            model=auto_model,
-                            messages=[{"role": "user", "content": fund_prompt}]
-                        )
-                        st.write(fund_response.choices[0].message.content)
-                    except:
-                        show_custom_alert("基本面 AI 评估加载失败。", "error")
-                else:
-                    show_custom_alert("请先配置 API Key 以查看 AI 评估。", "warning")
-                    
-            with tab2:
-                st.subheader(f"技术指标 : {primary_ticker}")
-                st.line_chart(df_primary[['RSI']])
-                st.line_chart(df_primary[['MACD', 'Signal']])
-                
-                df_candle = get_stock_data(primary_ticker, period)
-                
-                if not df_candle.empty:
-                    fig_candle = go.Figure(data=[go.Candlestick(
-                        x=df_candle.index,
-                        open=df_candle['Open'],
-                        high=df_candle['High'],
-                        low=df_candle['Low'],
-                        close=df_candle['Close'],
-                        name='Market Data'
-                    )])
-
-                    fig_candle.update_layout(
-                        template="plotly_dark",
-                        xaxis_rangeslider_visible=False,
-                        title=f"{primary_ticker} Candlestick Analysis",
-                        yaxis_title="Price",
-                        height=500
+                    news_response = client.chat.completions.create(
+                        model=auto_model,
+                        messages=[{"role": "user", "content": news_prompt}]
                     )
-                    
-                    st.plotly_chart(fig_candle, use_container_width=True)
-                    
-                    df_candle['SMA_20'] = df_candle['Close'].rolling(window=20).mean()
-                    st.line_chart(df_candle[['Close', 'SMA_20']])
-                else:
-                    st.warning("No technical data available.")
+                    st.markdown(f"""
+                    <div style="background-color: #1a1a1a; padding: 16px; border-radius: 8px; border: 1px solid #333333; color: #f0f0f0; font-size: 14px; line-height: 1.6;">
+                        {news_response.choices[0].message.content.replace('\n', '<br>')}
+                    </div>
+                    """, unsafe_allow_html=True)
+                except Exception as e:
+                    show_custom_alert(f"新闻舆情 AI 分析失败: {e}", "warning")
+            else:
+                show_custom_alert("请配置 API Key 以启用 AI 新闻舆情情感打分功能。", "warning")
+        else:
+            show_custom_alert("暂未获取到该股票的最新新闻数据。", "info")
 
-            with tab3:
-                st.subheader(f"{primary_ticker} 原始数据预览")
-                st.dataframe(df_primary.tail(10))
+        tab1, tab2, tab3 = st.tabs(["🏢 Fundamentals", "📊 Technical Indicators", "📋 Raw Data"])
+        
+        with tab1:
+            st.subheader(f"Fundamentals Analysis: {primary_ticker}")
+            
+            col1, col2, col3 = st.columns(3)
+            col1.metric("市值 (Market Cap)", market_cap_str)
+            col2.metric("市盈率 (P/E)", pe_str)
+            col3.metric("市净率 (P/B)", pb_str)
+            
+            st.markdown("---")
+            st.write("**💰 财务健康与现金流 (Deep Fundamentals):**")
+            
+            deep_data = get_deep_financials(primary_ticker)
+            
+            col_d1, col_d2, col_d3 = st.columns(3)
+            
+            de = deep_data.get('debtToEquity')
+            de_display = f"{de:.2f}" if de else "N/A"
+            col_d1.metric("债务/权益比 (D/E)", de_display, help="衡量杠杆率。数值过高可能存在债务风险。")
+            
+            qr = deep_data.get('quickRatio')
+            qr_display = f"{qr:.2f}" if qr else "N/A"
+            col_d2.metric("速动比率 (Quick Ratio)", qr_display, help="衡量短期偿债能力。通常 > 1 表示资金健康。")
+            
+            fcf = deep_data.get('freeCashFlow')
+            fcf_display = f"${fcf/1e9:.2f}B" if isinstance(fcf, (int, float)) else "N/A"
+            col_d3.metric("自由现金流 (FCF)", fcf_display, help="公司真正能装进口袋的钱。")
+            
+            col_d4, col_d5 = st.columns(2)
+            div = deep_data.get('dividendYield')
+            pay = deep_data.get('payoutRatio')
+            
+            col_d4.metric("股息率 (Dividend Yield)", f"{div*100:.2f}%" if div else "N/A")
+            col_d5.metric("派息比率 (Payout Ratio)", f"{pay*100:.2f}%" if pay else "N/A", help="判断分红是否可持续。")
+
+            st.markdown("---")
+            st.write("**🤖 AI Fundamental Evaluation:**")
+            if api_key and api_key != "你的API_KEY填在这里":
+                try:
+                    fund_prompt = f"基于 {primary_ticker} 的硬性数据（PE: {pe_str}, PB: {pb_str}, 利润率: {margin_str}, 营收增长: {growth_str}），请用数据推导列出5项核心基本面评价。"
+                    fund_response = client.chat.completions.create(
+                        model=auto_model,
+                        messages=[{"role": "user", "content": fund_prompt}]
+                    )
+                    st.write(fund_response.choices[0].message.content)
+                except:
+                    show_custom_alert("基本面 AI 评估加载失败。", "error")
+            else:
+                show_custom_alert("请先配置 API Key 以查看 AI 评估。", "warning")
+                
+        with tab2:
+            st.subheader(f"技术指标 : {primary_ticker}")
+            st.line_chart(df_primary[['RSI']])
+            st.line_chart(df_primary[['MACD', 'Signal']])
+            
+            df_candle = get_stock_data(primary_ticker, period)
+            
+            if not df_candle.empty:
+                fig_candle = go.Figure(data=[go.Candlestick(
+                    x=df_candle.index,
+                    open=df_candle['Open'],
+                    high=df_candle['High'],
+                    low=df_candle['Low'],
+                    close=df_candle['Close'],
+                    name='Market Data'
+                )])
+
+                fig_candle.update_layout(
+                    template="plotly_dark",
+                    xaxis_rangeslider_visible=False,
+                    title=f"{primary_ticker} Candlestick Analysis",
+                    yaxis_title="Price",
+                    height=500
+                )
+                
+                st.plotly_chart(fig_candle, use_container_width=True)
+                
+                df_candle['SMA_20'] = df_candle['Close'].rolling(window=20).mean()
+                st.line_chart(df_candle[['Close', 'SMA_20']])
+            else:
+                st.warning("No technical data available.")
+
+        with tab3:
+            st.subheader(f"{primary_ticker} 原始数据预览")
+            st.dataframe(df_primary.tail(10))
 
         except Exception as e:
             show_custom_alert(f"程序运行出错: {e}", "error")

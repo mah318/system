@@ -276,13 +276,7 @@ if app_mode == "📊 Data Analysis":
             if df_primary.empty:
                 show_custom_alert(f"未获取到 {primary_ticker} 的行情数据。", "error")
                 st.stop()
-                
-            info = get_stock_info(primary_ticker)
-            raw_market_cap = info.get('marketCap', 'N/A')
-            raw_pe = info.get('trailingPE', 'N/A')
-            raw_pb = info.get('priceToBook', 'N/A')
-            raw_margin = info.get('profitMargins', 'N/A')
-            raw_growth = info.get('revenueGrowth', 'N/A')
+           
 
           try:
         info = get_stock_info(primary_ticker)

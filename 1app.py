@@ -404,7 +404,7 @@ if app_mode == "📊 Data Analysis":
 
         tab1, tab2, tab3 = st.tabs(["🏢 Fundamentals", "📊 Technical Indicators", "📋 Raw Data"])
         
-        with tab1:
+       with tab1:
             st.subheader(f"Fundamentals Analysis: {primary_ticker}")
             
             col1, col2, col3 = st.columns(3)
@@ -412,6 +412,7 @@ if app_mode == "📊 Data Analysis":
             col2.metric("市盈率 (P/E)", pe_str)
             col3.metric("市净率 (P/B)", pb_str)
             
+            # --- 深度财务健康度 ---
             st.markdown("---")
             st.write("**💰 财务健康与现金流 (Deep Fundamentals):**")
             
@@ -419,25 +420,31 @@ if app_mode == "📊 Data Analysis":
             
             col_d1, col_d2, col_d3 = st.columns(3)
             
+            # 债务权益比（安全格式化）
             de = deep_data.get('debtToEquity')
-            de_display = f"{de:.2f}" if de else "N/A"
+            de_display = f"{de:.2f}" if isinstance(de, (int, float)) else "N/A"
             col_d1.metric("债务/权益比 (D/E)", de_display, help="衡量杠杆率。数值过高可能存在债务风险。")
             
+            # 速动比率（安全格式化）
             qr = deep_data.get('quickRatio')
-            qr_display = f"{qr:.2f}" if qr else "N/A"
+            qr_display = f"{qr:.2f}" if isinstance(qr, (int, float)) else "N/A"
             col_d2.metric("速动比率 (Quick Ratio)", qr_display, help="衡量短期偿债能力。通常 > 1 表示资金健康。")
             
+            # 自由现金流
             fcf = deep_data.get('freeCashFlow')
             fcf_display = f"${fcf/1e9:.2f}B" if isinstance(fcf, (int, float)) else "N/A"
             col_d3.metric("自由现金流 (FCF)", fcf_display, help="公司真正能装进口袋的钱。")
             
+            # --- 分红信息 ---
             col_d4, col_d5 = st.columns(2)
             div = deep_data.get('dividendYield')
             pay = deep_data.get('payoutRatio')
             
-            col_d4.metric("股息率 (Dividend Yield)", f"{div*100:.2f}%" if div else "N/A")
-            col_d5.metric("派息比率 (Payout Ratio)", f"{pay*100:.2f}%" if pay else "N/A", help="判断分红是否可持续。")
-
+            div_display = f"{div*100:.2f}%" if isinstance(div, (int, float)) else "N/A"
+            pay_display = f"{pay*100:.2f}%" if isinstance(pay, (int, float)) else "N/A"
+            
+            col_d4.metric("股息率 (Dividend Yield)", div_display)
+            col_d5.metric("派息比率 (Payout Ratio)", pay_display, help="判断分红是否可持续。")
             st.markdown("---")
             st.write("**🤖 AI Fundamental Evaluation:**")
             if api_key and api_key != "你的API_KEY填在这里":

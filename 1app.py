@@ -108,7 +108,7 @@ if st.sidebar.button("Log Out"):
     save_data()
     st.rerun()
 
-BUILTIN_API_KEY = "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"
+BUILTIN_API_KEY = "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"
 
 session = requests.Session()
 session.headers.update({

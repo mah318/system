@@ -283,6 +283,17 @@ if app_mode == "📊 Data Analysis":
             raw_pb = info.get('priceToBook', 'N/A')
             raw_margin = info.get('profitMargins', 'N/A')
             raw_growth = info.get('revenueGrowth', 'N/A')
+
+            # 安全格式化市盈率 / 市净率
+pe_str = f"{raw_pe:.2f}" if isinstance(raw_pe, (int, float)) else str(raw_pe)
+pb_str = f"{raw_pb:.2f}" if isinstance(raw_pb, (int, float)) else str(raw_pb)
+
+# 安全格式化市值
+market_cap_str = f"{raw_market_cap:,.0f}" if isinstance(raw_market_cap, (int, float)) else str(raw_market_cap)
+
+# 安全格式化利润率 / 增长率
+margin_str = f"{raw_margin * 100:.2f}%" if isinstance(raw_margin, (int, float)) else "N/A"
+growth_str = f"{raw_growth * 100:.2f}%" if isinstance(raw_growth, (int, float)) else "N/A"
             
             market_cap_str = f"{raw_market_cap:,}" if isinstance(raw_market_cap, (int, float)) else str(raw_market_cap)
             pe_str = f"{raw_pe:.2f}" if isinstance(raw_pe, (int, float)) else str(raw_pe)

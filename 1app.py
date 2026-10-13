@@ -260,42 +260,44 @@ if app_mode == "📊 Data Analysis":
         </div>
         """, unsafe_allow_html=True)
 
-      try:
-                fig = go.Figure()
-                for t in tickers_input:
-                    df = get_stock_data(t, period)
-                    if df.empty: continue
-                    y_data = (df['Close'] / df['Close'].iloc[0] - 1) * 100 if normalize else df['Close']
-                    fig.add_trace(go.Scatter(x=df.index, y=y_data, mode='lines', name=t))
+        try:
+            fig = go.Figure()
+            for t in tickers_input:
+                df = get_stock_data(t, period)
+                if df.empty: continue
+                y_data = (df['Close'] / df['Close'].iloc[0] - 1) * 100 if normalize else df['Close']
+                fig.add_trace(go.Scatter(x=df.index, y=y_data, mode='lines', name=t))
 
-                fig.update_layout(template="plotly_dark", title="收益率对比" if normalize else "价格对比")
-                st.plotly_chart(fig, use_container_width=True)
+            fig.update_layout(template="plotly_dark", title="收益率对比" if normalize else "价格对比")
+            st.plotly_chart(fig, use_container_width=True)
 
-                primary_ticker = tickers_input[0]
-                df_primary = get_stock_data(primary_ticker, period)
-                if df_primary.empty:
-                    show_custom_alert(f"未获取到 {primary_ticker} 的行情数据。", "error")
-                    st.stop()
-                    
-                try:
-                    info = get_stock_info(primary_ticker)
-                    raw_market_cap = info.get('marketCap', 'N/A')
-                    raw_pe = info.get('trailingPE', 'N/A')
-                    raw_pb = info.get('priceToBook', 'N/A')
-                    raw_margin = info.get('profitMargins', 'N/A')
-                    raw_growth = info.get('revenueGrowth', 'N/A')
-                    
-                    market_cap_str = f"{raw_market_cap:,.0f}" if isinstance(raw_market_cap, (int, float)) else str(raw_market_cap)
-                    pe_str = f"{raw_pe:.2f}" if isinstance(raw_pe, (int, float)) else str(raw_pe)
-                    pb_str = f"{raw_pb:.2f}" if isinstance(raw_pb, (int, float)) else str(raw_pb)
-                    margin_str = f"{raw_margin * 100:.2f}%" if isinstance(raw_margin, (int, float)) else "N/A"
-                    growth_str = f"{raw_growth * 100:.2f}%" if isinstance(raw_growth, (int, float)) else "N/A"
-                except Exception:
-                    market_cap_str = "N/A"
-                    pe_str = "N/A"
-                    pb_str = "N/A"
-                    margin_str = "N/A"
-                    growth_str = "N/A"
+            primary_ticker = tickers_input[0]
+            df_primary = get_stock_data(primary_ticker, period)
+            if df_primary.empty:
+                show_custom_alert(f"未获取到 {primary_ticker} 的行情数据。", "error")
+                st.stop()
+                
+            try:
+                info = get_stock_info(primary_ticker)
+                raw_market_cap = info.get('marketCap', 'N/A')
+                raw_pe = info.get('trailingPE', 'N/A')
+                raw_pb = info.get('priceToBook', 'N/A')
+                raw_margin = info.get('profitMargins', 'N/A')
+                raw_growth = info.get('revenueGrowth', 'N/A')
+                
+                market_cap_str = f"{raw_market_cap:,.0f}" if isinstance(raw_market_cap, (int, float)) else str(raw_market_cap)
+                pe_str = f"{raw_pe:.2f}" if isinstance(raw_pe, (int, float)) else str(raw_pe)
+                pb_str = f"{raw_pb:.2f}" if isinstance(raw_pb, (int, float)) else str(raw_pb)
+                margin_str = f"{raw_margin * 100:.2f}%" if isinstance(raw_margin, (int, float)) else "N/A"
+                growth_str = f"{raw_growth * 100:.2f}%" if isinstance(raw_growth, (int, float)) else "N/A"
+            except Exception:
+                market_cap_str = "N/A"
+                pe_str = "N/A"
+                pb_str = "N/A"
+                margin_str = "N/A"
+                growth_str = "N/A"
+        except Exception as e:
+            show_custom_alert(f"数据加载出错: {e}", "error")
             
             delta = df_primary['Close'].diff()
             gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()

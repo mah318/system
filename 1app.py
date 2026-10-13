@@ -489,8 +489,7 @@ if app_mode == "📊 Data Analysis":
             st.subheader(f"{primary_ticker} 原始数据预览")
             st.dataframe(df_primary.tail(10))
 
-        except Exception as e:
-            show_custom_alert(f"程序运行出错: {e}", "error")
+      
             
 elif app_mode == "🪙 Trading System":
     st.subheader("🪙 Trading & Automated Engine")

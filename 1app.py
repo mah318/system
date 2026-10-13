@@ -284,22 +284,25 @@ if app_mode == "📊 Data Analysis":
             raw_margin = info.get('profitMargins', 'N/A')
             raw_growth = info.get('revenueGrowth', 'N/A')
 
-            # 安全格式化市盈率 / 市净率
-pe_str = f"{raw_pe:.2f}" if isinstance(raw_pe, (int, float)) else str(raw_pe)
-pb_str = f"{raw_pb:.2f}" if isinstance(raw_pb, (int, float)) else str(raw_pb)
-
-# 安全格式化市值
-market_cap_str = f"{raw_market_cap:,.0f}" if isinstance(raw_market_cap, (int, float)) else str(raw_market_cap)
-
-# 安全格式化利润率 / 增长率
-margin_str = f"{raw_margin * 100:.2f}%" if isinstance(raw_margin, (int, float)) else "N/A"
-growth_str = f"{raw_growth * 100:.2f}%" if isinstance(raw_growth, (int, float)) else "N/A"
-            
-            market_cap_str = f"{raw_market_cap:,}" if isinstance(raw_market_cap, (int, float)) else str(raw_market_cap)
-            pe_str = f"{raw_pe:.2f}" if isinstance(raw_pe, (int, float)) else str(raw_pe)
-            pb_str = f"{raw_pb:.2f}" if isinstance(raw_pb, (int, float)) else str(raw_pb)
-            margin_str = f"{raw_margin * 100:.2f}%" if isinstance(raw_margin, (int, float)) else "N/A"
-            growth_str = f"{raw_growth * 100:.2f}%" if isinstance(raw_growth, (int, float)) else "N/A"
+          try:
+        info = get_stock_info(primary_ticker)
+        raw_market_cap = info.get('marketCap', 'N/A')
+        raw_pe = info.get('trailingPE', 'N/A')
+        raw_pb = info.get('priceToBook', 'N/A')
+        raw_margin = info.get('profitMargins', 'N/A')
+        raw_growth = info.get('revenueGrowth', 'N/A')
+        
+        market_cap_str = f"{raw_market_cap:,.0f}" if isinstance(raw_market_cap, (int, float)) else str(raw_market_cap)
+        pe_str = f"{raw_pe:.2f}" if isinstance(raw_pe, (int, float)) else str(raw_pe)
+        pb_str = f"{raw_pb:.2f}" if isinstance(raw_pb, (int, float)) else str(raw_pb)
+        margin_str = f"{raw_margin * 100:.2f}%" if isinstance(raw_margin, (int, float)) else "N/A"
+        growth_str = f"{raw_growth * 100:.2f}%" if isinstance(raw_growth, (int, float)) else "N/A"
+    except Exception:
+        market_cap_str = "N/A"
+        pe_str = "N/A"
+        pb_str = "N/A"
+        margin_str = "N/A"
+        growth_str = "N/A"
             
             delta = df_primary['Close'].diff()
             gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()

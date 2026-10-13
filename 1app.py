@@ -403,95 +403,95 @@ if app_mode == "📊 Data Analysis":
             show_custom_alert("暂未获取到该股票的最新新闻数据。", "info")
 
 tab1, tab2, tab3 = st.tabs(["🏢 Fundamentals", "📊 Technical Indicators", "📋 Raw Data"])
-        
-        with tab1:
-            st.subheader(f"Fundamentals Analysis: {primary_ticker}")
-            
-            col1, col2, col3 = st.columns(3)
-            col1.metric("市值 (Market Cap)", market_cap_str)
-            col2.metric("市盈率 (P/E)", pe_str)
-            col3.metric("市净率 (P/B)", pb_str)
-            
-            # --- 深度财务健康度 ---
-            st.markdown("---")
-            st.write("**💰 财务健康与现金流 (Deep Fundamentals):**")
-            
-            deep_data = get_deep_financials(primary_ticker)
-            
-            col_d1, col_d2, col_d3 = st.columns(3)
-            
-            de = deep_data.get('debtToEquity')
-            de_display = f"{de:.2f}" if isinstance(de, (int, float)) else "N/A"
-            col_d1.metric("债务/权益比 (D/E)", de_display, help="衡量杠杆率。数值过高可能存在债务风险。")
-            
-            qr = deep_data.get('quickRatio')
-            qr_display = f"{qr:.2f}" if isinstance(qr, (int, float)) else "N/A"
-            col_d2.metric("速动比率 (Quick Ratio)", qr_display, help="衡量短期偿债能力。通常 > 1 表示资金健康。")
-            
-            fcf = deep_data.get('freeCashFlow')
-            fcf_display = f"${fcf/1e9:.2f}B" if isinstance(fcf, (int, float)) else "N/A"
-            col_d3.metric("自由现金流 (FCF)", fcf_display, help="公司真正能装进口袋的钱。")
-            
-            col_d4, col_d5 = st.columns(2)
-            div = deep_data.get('dividendYield')
-            pay = deep_data.get('payoutRatio')
-            
-            div_display = f"{div*100:.2f}%" if isinstance(div, (int, float)) else "N/A"
-            pay_display = f"{pay*100:.2f}%" if isinstance(pay, (int, float)) else "N/A"
-            
-            col_d4.metric("股息率 (Dividend Yield)", div_display)
-            col_d5.metric("派息比率 (Payout Ratio)", pay_display, help="判断分红是否可持续。")
 
-            st.markdown("---")
-            st.write("**🤖 AI Fundamental Evaluation:**")
-            if api_key and api_key != "你的API_KEY填在这里":
-                try:
-                    fund_prompt = f"基于 {primary_ticker} 的硬性数据（PE: {pe_str}, PB: {pb_str}, 利润率: {margin_str}, 营收增长: {growth_str}），请用数据推导列出5项核心基本面评价。"
-                    fund_response = client.chat.completions.create(
-                        model=auto_model,
-                        messages=[{"role": "user", "content": fund_prompt}]
-                    )
-                    st.write(fund_response.choices[0].message.content)
-                except Exception:
-                    show_custom_alert("基本面 AI 评估加载失败。", "error")
-            else:
-                show_custom_alert("请先配置 API Key 以查看 AI 评估。", "warning")
-                
-        with tab2:
-            st.subheader(f"技术指标 : {primary_ticker}")
-            st.line_chart(df_primary[['RSI']])
-            st.line_chart(df_primary[['MACD', 'Signal']])
-            
-            df_candle = get_stock_data(primary_ticker, period)
-            
-            if not df_candle.empty:
-                fig_candle = go.Figure(data=[go.Candlestick(
-                    x=df_candle.index,
-                    open=df_candle['Open'],
-                    high=df_candle['High'],
-                    low=df_candle['Low'],
-                    close=df_candle['Close'],
-                    name='Market Data'
-                )])
+with tab1:
+    st.subheader(f"Fundamentals Analysis: {primary_ticker}")
 
-                fig_candle.update_layout(
-                    template="plotly_dark",
-                    xaxis_rangeslider_visible=False,
-                    title=f"{primary_ticker} Candlestick Analysis",
-                    yaxis_title="Price",
-                    height=500
-                )
-                
-                st.plotly_chart(fig_candle, use_container_width=True)
-                
-                df_candle['SMA_20'] = df_candle['Close'].rolling(window=20).mean()
-                st.line_chart(df_candle[['Close', 'SMA_20']])
-            else:
-                st.warning("No technical data available.")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("市值 (Market Cap)", market_cap_str)
+    col2.metric("市盈率 (P/E)", pe_str)
+    col3.metric("市净率 (P/B)", pb_str)
 
-        with tab3:
-            st.subheader(f"{primary_ticker} 原始数据预览")
-            st.dataframe(df_primary.tail(10))
+    # --- 深度财务健康度 ---
+    st.markdown("---")
+    st.write("**💰 财务健康与现金流 (Deep Fundamentals):**")
+
+    deep_data = get_deep_financials(primary_ticker)
+
+    col_d1, col_d2, col_d3 = st.columns(3)
+
+    de = deep_data.get('debtToEquity')
+    de_display = f"{de:.2f}" if isinstance(de, (int, float)) else "N/A"
+    col_d1.metric("债务/权益比 (D/E)", de_display, help="衡量杠杆率。数值过高可能存在债务风险。")
+
+    qr = deep_data.get('quickRatio')
+    qr_display = f"{qr:.2f}" if isinstance(qr, (int, float)) else "N/A"
+    col_d2.metric("速动比率 (Quick Ratio)", qr_display, help="衡量短期偿债能力。通常 > 1 表示资金健康。")
+
+    fcf = deep_data.get('freeCashFlow')
+    fcf_display = f"${fcf/1e9:.2f}B" if isinstance(fcf, (int, float)) else "N/A"
+    col_d3.metric("自由现金流 (FCF)", fcf_display, help="公司真正能装进口袋的钱。")
+
+    col_d4, col_d5 = st.columns(2)
+    div = deep_data.get('dividendYield')
+    pay = deep_data.get('payoutRatio')
+
+    div_display = f"{div*100:.2f}%" if isinstance(div, (int, float)) else "N/A"
+    pay_display = f"{pay*100:.2f}%" if isinstance(pay, (int, float)) else "N/A"
+
+    col_d4.metric("股息率 (Dividend Yield)", div_display)
+    col_d5.metric("派息比率 (Payout Ratio)", pay_display, help="判断分红是否可持续。")
+
+    st.markdown("---")
+    st.write("**🤖 AI Fundamental Evaluation:**")
+    if api_key and api_key != "你的API_KEY填在这里":
+        try:
+            fund_prompt = f"基于 {primary_ticker} 的硬性数据（PE: {pe_str}, PB: {pb_str}, 利润率: {margin_str}, 营收增长: {growth_str}），请用数据推导列出5项核心基本面评价。"
+            fund_response = client.chat.completions.create(
+                model=auto_model,
+                messages=[{"role": "user", "content": fund_prompt}]
+            )
+            st.write(fund_response.choices[0].message.content)
+        except Exception:
+            show_custom_alert("基本面 AI 评估加载失败。", "error")
+    else:
+        show_custom_alert("请先配置 API Key 以查看 AI 评估。", "warning")
+
+with tab2:
+    st.subheader(f"技术指标 : {primary_ticker}")
+    st.line_chart(df_primary[['RSI']])
+    st.line_chart(df_primary[['MACD', 'Signal']])
+
+    df_candle = get_stock_data(primary_ticker, period)
+
+    if not df_candle.empty:
+        fig_candle = go.Figure(data=[go.Candlestick(
+            x=df_candle.index,
+            open=df_candle['Open'],
+            high=df_candle['High'],
+            low=df_candle['Low'],
+            close=df_candle['Close'],
+            name='Market Data'
+        )])
+
+        fig_candle.update_layout(
+            template="plotly_dark",
+            xaxis_rangeslider_visible=False,
+            title=f"{primary_ticker} Candlestick Analysis",
+            yaxis_title="Price",
+            height=500
+        )
+
+        st.plotly_chart(fig_candle, use_container_width=True)
+
+        df_candle['SMA_20'] = df_candle['Close'].rolling(window=20).mean()
+        st.line_chart(df_candle[['Close', 'SMA_20']])
+    else:
+        st.warning("No technical data available.")
+
+with tab3:
+    st.subheader(f"{primary_ticker} 原始数据预览")
+    st.dataframe(df_primary.tail(10))
       
             
 elif app_mode == "🪙 Trading System":

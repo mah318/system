@@ -402,7 +402,7 @@ if app_mode == "📊 Data Analysis":
         else:
             show_custom_alert("暂未获取到该股票的最新新闻数据。", "info")
 
-       tab1, tab2, tab3 = st.tabs(["🏢 Fundamentals", "📊 Technical Indicators", "📋 Raw Data"])
+tab1, tab2, tab3 = st.tabs(["🏢 Fundamentals", "📊 Technical Indicators", "📋 Raw Data"])
         
         with tab1:
             st.subheader(f"Fundamentals Analysis: {primary_ticker}")
@@ -491,8 +491,7 @@ if app_mode == "📊 Data Analysis":
 
         with tab3:
             st.subheader(f"{primary_ticker} 原始数据预览")
-            st.dataframe(df_primary.tail(10)) 
-
+            st.dataframe(df_primary.tail(10))
       
             
 elif app_mode == "🪙 Trading System":

@@ -491,7 +491,7 @@ if app_mode == "📊 Data Analysis":
 
         with tab3:
             st.subheader(f"{primary_ticker} 原始数据预览")
-            st.dataframe(df_primary.tail(10))
+            st.dataframe(df_primary.tail(10)) 
 
       
             
